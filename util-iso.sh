@@ -93,7 +93,7 @@ change_grub_version() {
 
 generate_environment() {
     local _profile="$1"
-    if [ "$_profile" == "desktop" ]; then
+    if [ "$_profile" == "desktop" ] || [ "$_profile" == "fenrir" ]; then
         cat << 'EOF' > ${src_dir}/archiso/airootfs/etc/environment
 ZPOOL_VDEV_NAME_PATH=1
 EOF
@@ -103,7 +103,7 @@ EOF
 generate_version_tag() {
     local _profile="$1"
     local _version="$2"
-    if [ "$_profile" == "desktop" ]; then
+    if [ "$_profile" == "desktop" ] || [ "$_profile" == "fenrir" ]; then
         echo "${_version}" > ${src_dir}/archiso/airootfs/etc/version-tag
     fi
 }
@@ -141,6 +141,9 @@ prepare_profile(){
     if [ "$profile" == "desktop" ]; then
         cp ${src_dir}/archiso/packages_desktop.x86_64 ${src_dir}/archiso/packages.x86_64
         ln -sf /usr/lib/systemd/system/plasmalogin.service ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
+    elif [ "$profile" == "fenrir" ]; then
+        cp ${src_dir}/archiso/packages_fenrir.x86_64 ${src_dir}/archiso/packages.x86_64
+        ln -sf /usr/lib/systemd/system/sddm.service ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
     else
         die "Unknown profile: [%s]" "${profile}"
     fi
@@ -187,8 +190,8 @@ run_build() {
     sudo mkarchiso -v -w ${work_dir} -o "$outFolder/$_profile" ${work_dir}/archiso/
     sudo chown $USER $outFolder
 
-    cp ${work_dir}/iso/arch/pkglist.x86_64.txt "$outFolder/$_profile/$(gen_iso_fn).pkgs.txt"
-    mv "$outFolder/$_profile/cachyos-$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)-x86_64.iso" "$outFolder/$_profile/${iso_file}"
+    cp ${work_dir}/iso/fenrir/pkglist.x86_64.txt "$outFolder/$_profile/$(gen_iso_fn).pkgs.txt"
+    mv "$outFolder/$_profile/fenrir-$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)-x86_64.iso" "$outFolder/$_profile/${iso_file}"
 
     msg "Done [Build ISO] ${iso_file}"
     msg "Finished building [%s]" "${_profile}"
@@ -226,8 +229,7 @@ run_build() {
 
 gen_iso_fn(){
     local vars=() name
-    vars+=("cachyos")
-    [[ -n ${profile} ]] && vars+=("${profile}")
+    vars+=("fenrir")
 
     vars+=("linux")
     vars+=("$(date +%y%m%d)")
