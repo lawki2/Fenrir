@@ -107,8 +107,12 @@ for pkg in "${caelestia_aur_pkgs[@]}"; do
     build_one "$pkg" aur
 done
 
-# caelestia-meta itself isn't published on AUR. It's built from the PKGBUILD
-# already checked out at ~/caelestia (kept in sync via git pull there).
+# caelestia-meta itself isn't published on AUR. It's built from the
+# PKGBUILD at ~/caelestia, cloned fresh here if it's not already present
+# (e.g. in CI), or kept in sync via git pull there otherwise.
+if [[ ! -d "$HOME/caelestia" ]]; then
+    git clone https://github.com/caelestia-dots/caelestia.git "$HOME/caelestia"
+fi
 build_one "caelestia-meta" "$HOME/caelestia"
 
 # fenrir-installer is Fenrir's own package, not on AUR either. Its PKGBUILD
