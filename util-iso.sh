@@ -161,22 +161,30 @@ prepare_profile(){
         # limine-mkinitcpio/limine-update, which limine-entry-tool alone
         # does not ship.
         cp ${src_dir}/archiso/packages_fenrir.x86_64 ${src_dir}/archiso/airootfs/etc/fenrir-packages.x86_64
-        # archiso/pacman.conf's [fenrir-local] repo points at an absolute
-        # path on this build host (local-repo/), which only exists here.
-        # That's fine for pacstrapping the live image itself, since mkarchiso
-        # runs directly on this host, but the same pacman.conf also ends up
-        # as the live image's own /etc/pacman.conf, and fenrir-installer
-        # later re-pacstraps this same package list onto the real target
-        # disk from *within* the booted live system, wherever that's
-        # running. So the local packages need to physically ship inside the
-        # live image too. customize_airootfs.sh repoints [fenrir-local] at
-        # this baked-in copy after packages are installed.
+        # fenrir-installer re-pacstraps this same package list onto the
+        # real target disk from *within* the booted live system, wherever
+        # that's actually running, so the local packages need to physically
+        # ship inside the live image too, not just be reachable from this
+        # build host. archiso/airootfs/etc/pacman.conf is the live image's
+        # own real /etc/pacman.conf (copied in as-is, unlike
+        # archiso/pacman.conf which mkarchiso only uses for a temporary
+        # build-time work config), so its [fenrir-local] entry points here
+        # instead, at this baked-in copy.
         rm -rf ${src_dir}/archiso/airootfs/opt/fenrir-local-repo
         mkdir -p ${src_dir}/archiso/airootfs/opt/fenrir-local-repo
         cp ${src_dir}/local-repo/*.pkg.tar.zst ${src_dir}/archiso/airootfs/opt/fenrir-local-repo/
         cp -P ${src_dir}/local-repo/fenrir-local.db ${src_dir}/local-repo/fenrir-local.db.tar.gz \
             ${src_dir}/local-repo/fenrir-local.files ${src_dir}/local-repo/fenrir-local.files.tar.gz \
             ${src_dir}/archiso/airootfs/opt/fenrir-local-repo/
+        # archiso/airootfs/etc/pacman.conf is shared with the unrelated
+        # "desktop" profile, which has no local-repo/ and shouldn't get a
+        # dangling repo entry, so this only gets added here, not committed
+        # to the tracked file. Guarded so repeated fenrir builds in the
+        # same checkout don't append it twice.
+        if ! grep -q "^\[fenrir-local\]$" ${src_dir}/archiso/airootfs/etc/pacman.conf; then
+            sed -i "/^\[cachyos\]$/i [fenrir-local]\nSigLevel = Optional TrustAll\nServer = file:///opt/fenrir-local-repo\n" \
+                ${src_dir}/archiso/airootfs/etc/pacman.conf
+        fi
     else
         die "Unknown profile: [%s]" "${profile}"
     fi
@@ -212,6 +220,26 @@ run_build() {
     msg2 "Copying the Archiso folder to build work"
     mkdir -p ${work_dir}
     cp -r archiso ${work_dir}/archiso
+
+    if [ "$_profile" == "fenrir" ]; then
+        # [fenrir-local] is injected into the work copy only, not the
+        # tracked archiso/pacman.conf, since that file is shared with the
+        # unrelated "desktop" profile (built in CI, which has no
+        # local-repo/ and shouldn't need one). Using an absolute host path
+        # here is fine: this pacman.conf is only ever used directly by
+        # build-time pacstrap on this same host, never copied into a live
+        # image (that's archiso/airootfs/etc/pacman.conf, a different
+        # file, which points at the live-filesystem copy instead).
+        cat <<EOF >> ${work_dir}/archiso/pacman.conf
+
+# Locally prebuilt AUR packages Caelestia and fenrir-installer need (see
+# build-local-repo.sh). Listed last as an override doesn't apply here;
+# pacman.conf repo order only matters for same-named package precedence.
+[fenrir-local]
+SigLevel = Optional TrustAll
+Server = file://${src_dir}/local-repo
+EOF
+    fi
 
     msg "Start [Build ISO]"
 
