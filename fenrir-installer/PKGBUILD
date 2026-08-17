@@ -1,8 +1,8 @@
 # Maintainer: Fenrir
 pkgname=fenrir-installer
 pkgver=1.0.0
-pkgrel=10
-pkgdesc="Fenrir's themed GTK4 installer"
+pkgrel=11
+pkgdesc="Fenrir's themed QML/Quickshell installer"
 arch=('x86_64')
 license=('GPL-3.0-only')
 # limine and limine-entry-tool are deliberately not listed here. The
@@ -12,9 +12,9 @@ license=('GPL-3.0-only')
 # hook to deploy onto). Depending on them here would pull them into the
 # live image too, where that same hook fails since there's no real ESP.
 depends=(
-  'gtk4'
-  'libadwaita'
-  'python-gobject'
+  'quickshell'
+  'caelestia-shell'
+  'python'
   'arch-install-scripts'
   'gptfdisk'
   'dosfstools'
@@ -25,9 +25,17 @@ source=()
 
 package() {
   install -Dm755 "$startdir/bin/fenrir-installer" "$pkgdir/usr/bin/fenrir-installer"
-  for f in "$startdir"/lib/*.py; do
-    install -Dm644 "$f" "$pkgdir/usr/lib/fenrir-installer/$(basename "$f")"
+
+  install -Dm644 "$startdir/lib/backend.py" "$pkgdir/usr/lib/fenrir-installer/backend.py"
+  install -Dm644 "$startdir/lib/cli.py" "$pkgdir/usr/lib/fenrir-installer/cli.py"
+
+  for f in "$startdir"/qml/*.qml; do
+    install -Dm644 "$f" "$pkgdir/etc/xdg/quickshell/fenrir-installer/$(basename "$f")"
   done
+  for f in "$startdir"/qml/pages/*.qml; do
+    install -Dm644 "$f" "$pkgdir/etc/xdg/quickshell/fenrir-installer/pages/$(basename "$f")"
+  done
+
   install -Dm644 "$startdir/fenrir-installer.desktop" \
     "$pkgdir/usr/share/applications/fenrir-installer.desktop"
 }

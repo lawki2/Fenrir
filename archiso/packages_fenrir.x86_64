@@ -202,11 +202,6 @@ thunar
 quickshell
 pamac-aur
 
-# Fenrir's own installer, replacing Calamares.
-gtk4
-libadwaita
-python-gobject
-
 # AUR built packages, see build-local-repo.sh and local-repo.
 qtengine
 app2unit
