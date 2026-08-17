@@ -14,7 +14,7 @@ repo_name="fenrir-local"
 mkdir -p "$work_dir" "$repo_dir"
 
 # Packages with no interdependencies among themselves, build first.
-independent_aur_pkgs=(qtengine app2unit python-materialyoucolor libcava ttf-rubik-vf)
+independent_aur_pkgs=(qtengine app2unit python-materialyoucolor libcava ttf-rubik-vf zen-browser-bin)
 # Depends on packages built in the previous stage.
 caelestia_aur_pkgs=(caelestia-cli caelestia-shell)
 

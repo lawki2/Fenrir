@@ -200,6 +200,7 @@ polkit-gnome
 gnome-keyring
 thunar
 quickshell
+pamac-aur
 
 # Fenrir's own installer, replacing Calamares.
 gtk4
@@ -216,3 +217,4 @@ python-materialyoucolor
 libcava
 ttf-rubik-vf
 fenrir-installer
+zen-browser-bin
