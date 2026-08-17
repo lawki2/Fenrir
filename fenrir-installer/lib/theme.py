@@ -51,16 +51,72 @@ def _load_colours():
     return {name: f"#{value}" for name, value in colours.items()}
 
 
-def build_css():
-    """Returns a GTK CSS string mapping the active Caelestia scheme onto
-    libadwaita's named colours, or None if no scheme could be read."""
+def _colour_css():
     colours = _load_colours()
     if not colours:
-        return None
+        return ""
+    lines = [
+        f"@define-color {adwaita_name} {colours[token]};"
+        for adwaita_name, token in ADWAITA_COLOUR_MAP.items()
+        if token in colours
+    ]
+    return "\n".join(lines)
 
-    lines = []
-    for adwaita_name, token in ADWAITA_COLOUR_MAP.items():
-        value = colours.get(token)
-        if value:
-            lines.append(f"@define-color {adwaita_name} {value};")
-    return "\n".join(lines) if lines else None
+
+# Caelestia's real Material 3 token values, read from caelestia-shell's own
+# source (tokens.hpp), not approximated. GTK has no var()-style mechanism
+# for non-colour values, so these are just written directly into each rule
+# below rather than declared once and reused.
+#
+# rounding:  extraSmall 4, small 12, normal 17, large 25, full 1000
+# spacing:   small 7, smaller 10, normal 12, larger 15, large 20
+# padding:   small 5, smaller 7, normal 10, larger 12, large 15
+_STRUCTURE_CSS = """
+window, .background {
+    font-family: "Rubik";
+}
+
+textview, .log-view {
+    font-family: "CaskaydiaCove NF";
+}
+
+button {
+    border-radius: 12px; /* rounding.small */
+}
+
+entry, .entry {
+    border-radius: 12px; /* rounding.small */
+}
+
+list.boxed-list, list.content, .card {
+    border-radius: 17px; /* rounding.normal */
+}
+
+list.boxed-list > row, list.content > row {
+    border-radius: 12px; /* rounding.small */
+}
+
+/* Material 3 state layers: hover/press are opacity overlays on top of the
+   existing fill, not a colour swap. box-shadow inset is the GTK CSS
+   equivalent of QML's `opacity: pressed ? 0.1 : hovered ? 0.08 : 0`. */
+button:hover, row:hover {
+    box-shadow: inset 0 0 0 999px alpha(@window_fg_color, 0.08);
+}
+
+button:active, button:checked, row:active {
+    box-shadow: inset 0 0 0 999px alpha(@window_fg_color, 0.1);
+}
+""".strip()
+
+
+def build_css():
+    """Returns the full GTK CSS stylesheet: the live colour scheme mapping
+    (only if scheme.json could be read) followed by Caelestia's structural
+    design tokens (always applied). Colours have to come first since the
+    structural rules reference them via alpha(@window_fg_color, ...)."""
+    parts = []
+    colour_css = _colour_css()
+    if colour_css:
+        parts.append(colour_css)
+    parts.append(_STRUCTURE_CSS)
+    return "\n\n".join(parts)

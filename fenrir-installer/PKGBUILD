@@ -1,7 +1,7 @@
 # Maintainer: Fenrir
 pkgname=fenrir-installer
 pkgver=1.0.0
-pkgrel=9
+pkgrel=10
 pkgdesc="Fenrir's themed GTK4 installer"
 arch=('x86_64')
 license=('GPL-3.0-only')

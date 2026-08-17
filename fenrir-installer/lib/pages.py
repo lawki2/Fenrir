@@ -184,11 +184,11 @@ class ProgressPage(Gtk.Box):
     def __init__(self):
         super().__init__(
             orientation=Gtk.Orientation.VERTICAL,
-            spacing=12,
-            margin_top=24,
-            margin_bottom=24,
-            margin_start=24,
-            margin_end=24,
+            spacing=12,  # Tokens.spacing.normal
+            margin_top=20,  # Tokens.spacing.large
+            margin_bottom=20,
+            margin_start=20,
+            margin_end=20,
         )
 
         self.status_label = Gtk.Label(label="Installing Fenrir…", xalign=0)
