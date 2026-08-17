@@ -1,0 +1,83 @@
+import QtQuick
+import QtQuick.Layouts
+import Quickshell.Io
+import Caelestia.Config
+import "../"
+
+Item {
+    id: root
+
+    readonly property string confirmText: "ERASE"
+    readonly property bool confirmed: root.selectedDiskLabel !== "" && confirmField.text === confirmText
+    readonly property var diskLabels: root.disks.map(root.diskLabel)
+    readonly property string selectedDisk: {
+        const i = root.diskLabels.indexOf(root.selectedDiskLabel);
+        return i >= 0 ? root.disks[i].path : "";
+    }
+
+    property var disks: []
+    property string selectedDiskLabel: ""
+    property bool errorVisible: false
+
+    function showError(): void {
+        root.errorVisible = true;
+    }
+
+    function diskLabel(disk): string {
+        const gib = disk.size / (1024 ** 3);
+        const model = disk.model ? ` (${disk.model})` : "";
+        return `${disk.path}${model} — ${gib.toFixed(0)} GiB`;
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: TokenConfig.appearance.spacing.large
+
+        Text {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: "The selected disk will be completely erased and repartitioned. This cannot be undone."
+            color: Colours.m3error
+            font.family: "Rubik"
+            font.pointSize: TokenConfig.appearance.fontSize.normal
+        }
+
+        SelectField {
+            label: "Target disk"
+            value: root.selectedDiskLabel
+            options: root.diskLabels
+            Layout.fillWidth: true
+            onPicked: value => root.selectedDiskLabel = value
+        }
+
+        LabelledField {
+            label: `Type "${root.confirmText}" to confirm`
+            Layout.fillWidth: true
+
+            StyledTextField {
+                id: confirmField
+                anchors.fill: parent
+                onTextChanged: root.errorVisible = false
+            }
+        }
+
+        Text {
+            visible: root.errorVisible
+            text: "Select a disk and type ERASE to confirm."
+            color: Colours.m3error
+            font.family: "Rubik"
+            font.pointSize: TokenConfig.appearance.fontSize.small
+        }
+
+        Item { Layout.fillHeight: true }
+    }
+
+    Process {
+        id: listDisksProc
+        command: ["python3", "/usr/lib/fenrir-installer/cli.py", "list-disks"]
+        stdout: StdioCollector {
+            onStreamFinished: root.disks = JSON.parse(text)
+        }
+        Component.onCompleted: running = true
+    }
+}
