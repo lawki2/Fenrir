@@ -57,23 +57,20 @@ trap_exit() {
 
 generate_motd() {
     cat << 'EOF' > ${src_dir}/archiso/airootfs/etc/motd
-This ISO is based on ArchLinux ISO modified to provide Installation Environment for [38;2;23;147;209mCachyOS[0m.
-https://cachyos.org
+This ISO is based on ArchLinux ISO modified to provide Installation Environment for [38;2;23;147;209mFenrir[0m.
 
-CachyOS Archiso Sources:
-https://github.com/cachyos/cachyos-live-iso
+Fenrir Archiso Sources:
+https://github.com/lawki2/Fenrir
+
+Built on CachyOS:
+https://cachyos.org
 
 ArchLinux ISO Source:
 https://gitlab.archlinux.org/archlinux/archiso
 
-Calamares is used as GUI installer:
-https://github.com/calamares/calamares
+Live environment will start now and let you install [38;2;23;147;209mFenrir[0m to disk.
 
-Live environment will start now and let you install [38;2;23;147;209mCachyOS[0m to disk.
-
-Getting help at the forum: https://discuss.cachyos.org
-
-Welcome to your [38;2;23;147;209mCachyOS[0m!
+Welcome to your [38;2;23;147;209mFenrir[0m!
 
 [41m [41m [41m [40m [44m [40m [41m [46m [45m [41m [46m [43m [41m [44m [45m [40m [44m [40m [41m [44m [41m [41m [46m [42m [41m [44m [43m [41m [45m [40m [40m [44m [40m [41m [44m [42m [41m [46m [44m [41m [46m [47m [0m
 EOF
@@ -88,12 +85,12 @@ fetch_cachyos_mirrorlist() {
 
 change_grub_version() {
     local _version="$1"
-    sed -i "s/CACHYOS_VERSION=\".*\"/CACHYOS_VERSION=\"${_version}\"/" ${src_dir}/archiso/grub/grub.cfg
+    sed -i "s/FENRIR_VERSION=\".*\"/FENRIR_VERSION=\"${_version}\"/" ${src_dir}/archiso/grub/grub.cfg
 }
 
 generate_environment() {
     local _profile="$1"
-    if [ "$_profile" == "desktop" ] || [ "$_profile" == "fenrir" ]; then
+    if [ "$_profile" == "fenrir" ]; then
         cat << 'EOF' > ${src_dir}/archiso/airootfs/etc/environment
 ZPOOL_VDEV_NAME_PATH=1
 EOF
@@ -103,7 +100,7 @@ EOF
 generate_version_tag() {
     local _profile="$1"
     local _version="$2"
-    if [ "$_profile" == "desktop" ] || [ "$_profile" == "fenrir" ]; then
+    if [ "$_profile" == "fenrir" ]; then
         echo "${_version}" > ${src_dir}/archiso/airootfs/etc/version-tag
     fi
 }
@@ -138,10 +135,7 @@ prepare_profile(){
     generate_motd
 
     rm -f ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
-    if [ "$profile" == "desktop" ]; then
-        cp ${src_dir}/archiso/packages_desktop.x86_64 ${src_dir}/archiso/packages.x86_64
-        ln -sf /usr/lib/systemd/system/plasmalogin.service ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
-    elif [ "$profile" == "fenrir" ]; then
+    if [ "$profile" == "fenrir" ]; then
         # limine and limine-mkinitcpio-hook are excluded from the live
         # image's own package list. Their post-install pacman hook deploys
         # Limine onto a mounted ESP, which doesn't exist while mkarchiso is
@@ -176,11 +170,10 @@ prepare_profile(){
         cp -P ${src_dir}/local-repo/fenrir-local.db ${src_dir}/local-repo/fenrir-local.db.tar.gz \
             ${src_dir}/local-repo/fenrir-local.files ${src_dir}/local-repo/fenrir-local.files.tar.gz \
             ${src_dir}/archiso/airootfs/opt/fenrir-local-repo/
-        # archiso/airootfs/etc/pacman.conf is shared with the unrelated
-        # "desktop" profile, which has no local-repo/ and shouldn't get a
-        # dangling repo entry, so this only gets added here, not committed
-        # to the tracked file. Guarded so repeated fenrir builds in the
-        # same checkout don't append it twice.
+        # Not committed to the tracked archiso/airootfs/etc/pacman.conf,
+        # since local-repo/ is a build-time-only concept. Guarded so
+        # repeated fenrir builds in the same checkout don't append it
+        # twice.
         if ! grep -q "^\[fenrir-local\]$" ${src_dir}/archiso/airootfs/etc/pacman.conf; then
             sed -i "/^\[cachyos\]$/i [fenrir-local]\nSigLevel = Optional TrustAll\nServer = file:///opt/fenrir-local-repo\n" \
                 ${src_dir}/archiso/airootfs/etc/pacman.conf
@@ -223,13 +216,12 @@ run_build() {
 
     if [ "$_profile" == "fenrir" ]; then
         # [fenrir-local] is injected into the work copy only, not the
-        # tracked archiso/pacman.conf, since that file is shared with the
-        # unrelated "desktop" profile (built in CI, which has no
-        # local-repo/ and shouldn't need one). Using an absolute host path
-        # here is fine: this pacman.conf is only ever used directly by
-        # build-time pacstrap on this same host, never copied into a live
-        # image (that's archiso/airootfs/etc/pacman.conf, a different
-        # file, which points at the live-filesystem copy instead).
+        # tracked archiso/pacman.conf, since local-repo/ is a build-time-
+        # only concept. Using an absolute host path here is fine: this
+        # pacman.conf is only ever used directly by build-time pacstrap on
+        # this same host, never copied into a live image (that's
+        # archiso/airootfs/etc/pacman.conf, a different file, which points
+        # at the live-filesystem copy instead).
         cat <<EOF >> ${work_dir}/archiso/pacman.conf
 
 # Locally prebuilt AUR packages Caelestia and fenrir-installer need (see
