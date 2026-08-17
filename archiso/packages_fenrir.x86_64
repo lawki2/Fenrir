@@ -15,9 +15,6 @@ bolt
 brltty
 btrfs-progs
 cachy-chroot
-cachyos-calamares
-cachyos-cli-installer-new
-cachyos-hello
 cachyos-hooks
 cachyos-keyring
 cachyos-mirrorlist
@@ -55,7 +52,7 @@ gparted
 gptfdisk
 haveged
 limine
-limine-entry-tool
+limine-mkinitcpio-hook
 hwdetect
 hwinfo
 hyperv
@@ -202,7 +199,12 @@ ttf-jetbrains-mono-nerd
 polkit-gnome
 gnome-keyring
 thunar
-quickshell-git
+quickshell
+
+# Fenrir's own installer, replacing Calamares.
+gtk4
+libadwaita
+python-gobject
 
 # AUR built packages, see build-local-repo.sh and local-repo.
 qtengine
@@ -213,3 +215,4 @@ caelestia-meta
 python-materialyoucolor
 libcava
 ttf-rubik-vf
+fenrir-installer

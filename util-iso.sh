@@ -142,8 +142,41 @@ prepare_profile(){
         cp ${src_dir}/archiso/packages_desktop.x86_64 ${src_dir}/archiso/packages.x86_64
         ln -sf /usr/lib/systemd/system/plasmalogin.service ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
     elif [ "$profile" == "fenrir" ]; then
-        cp ${src_dir}/archiso/packages_fenrir.x86_64 ${src_dir}/archiso/packages.x86_64
+        # limine and limine-mkinitcpio-hook are excluded from the live
+        # image's own package list. Their post-install pacman hook deploys
+        # Limine onto a mounted ESP, which doesn't exist while mkarchiso is
+        # just building a squashfs, so it fails loudly (harmlessly, but
+        # noisily) every build. The live ISO boots via mkarchiso's own
+        # SYSLINUX/GRUB setup, not a pacstrapped Limine, so it doesn't need
+        # them anyway.
+        grep -vE '^(limine|limine-mkinitcpio-hook)$' ${src_dir}/archiso/packages_fenrir.x86_64 > ${src_dir}/archiso/packages.x86_64
         ln -sf /usr/lib/systemd/system/sddm.service ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
+        # fenrir-installer pacstraps the same package list the live image
+        # itself was built from, so the installed system always matches
+        # what's already been verified booting live. Baking a copy into
+        # the airootfs is how it reads that list at install time. Unlike
+        # packages.x86_64 above, this keeps limine/limine-mkinitcpio-hook,
+        # since this list is used to pacstrap the real target disk, which
+        # does have a real ESP for that hook to deploy onto, and provides
+        # limine-mkinitcpio/limine-update, which limine-entry-tool alone
+        # does not ship.
+        cp ${src_dir}/archiso/packages_fenrir.x86_64 ${src_dir}/archiso/airootfs/etc/fenrir-packages.x86_64
+        # archiso/pacman.conf's [fenrir-local] repo points at an absolute
+        # path on this build host (local-repo/), which only exists here.
+        # That's fine for pacstrapping the live image itself, since mkarchiso
+        # runs directly on this host, but the same pacman.conf also ends up
+        # as the live image's own /etc/pacman.conf, and fenrir-installer
+        # later re-pacstraps this same package list onto the real target
+        # disk from *within* the booted live system, wherever that's
+        # running. So the local packages need to physically ship inside the
+        # live image too. customize_airootfs.sh repoints [fenrir-local] at
+        # this baked-in copy after packages are installed.
+        rm -rf ${src_dir}/archiso/airootfs/opt/fenrir-local-repo
+        mkdir -p ${src_dir}/archiso/airootfs/opt/fenrir-local-repo
+        cp ${src_dir}/local-repo/*.pkg.tar.zst ${src_dir}/archiso/airootfs/opt/fenrir-local-repo/
+        cp -P ${src_dir}/local-repo/fenrir-local.db ${src_dir}/local-repo/fenrir-local.db.tar.gz \
+            ${src_dir}/local-repo/fenrir-local.files ${src_dir}/local-repo/fenrir-local.files.tar.gz \
+            ${src_dir}/archiso/airootfs/opt/fenrir-local-repo/
     else
         die "Unknown profile: [%s]" "${profile}"
     fi

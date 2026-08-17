@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# /etc/fenrir-packages.x86_64 only exists on the live image itself (baked
+# in at build time, never pacstrapped onto an installed system), so this
+# only launches on the live ISO, never on an installed system.
+if [ -f /etc/fenrir-packages.x86_64 ]; then
+    exec pkexec-wrapper fenrir-installer
+fi

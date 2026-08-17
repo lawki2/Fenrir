@@ -27,3 +27,7 @@ local-repo/*.pkg.tar.zst
 local-repo/*.db*
 local-repo/*.files*
 serial.log
+archiso/airootfs/etc/fenrir-packages.x86_64
+archiso/airootfs/opt/
+OVMF_VARS.fd
+__pycache__/

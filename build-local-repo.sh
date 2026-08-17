@@ -75,6 +75,16 @@ build_one() {
         cp -r "$src"/* "$build_root"/
     fi
 
+    if [[ "$pkg" == "caelestia-shell" ]]; then
+        # caelestia-shell's own PKGBUILD depends on quickshell-git specifically.
+        # CachyOS's quickshell-git repo build is a stale snapshot that predates
+        # quickshell's "DefaultEnv" pragma support, which the current shell.qml
+        # requires to even launch. CachyOS's plain "quickshell" package is a
+        # newer, actively rebuilt release with that support, so build against
+        # that instead.
+        sed -i "s/'quickshell-git'/'quickshell'/" "$build_root/PKGBUILD"
+    fi
+
     echo "==> Building $pkg"
     (
         cd "$build_root"
@@ -100,6 +110,10 @@ done
 # caelestia-meta itself isn't published on AUR. It's built from the PKGBUILD
 # already checked out at ~/caelestia (kept in sync via git pull there).
 build_one "caelestia-meta" "$HOME/caelestia"
+
+# fenrir-installer is Fenrir's own package, not on AUR either. Its PKGBUILD
+# lives in this repo.
+build_one "fenrir-installer" "$src_dir/fenrir-installer"
 
 echo "==> Done. Built packages are in $repo_dir"
 ls -1 "$repo_dir"/*.pkg.tar.zst

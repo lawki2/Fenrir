@@ -1,0 +1,33 @@
+# Maintainer: Fenrir
+pkgname=fenrir-installer
+pkgver=1.0.0
+pkgrel=9
+pkgdesc="Fenrir's themed GTK4 installer"
+arch=('x86_64')
+license=('GPL-3.0-only')
+# limine and limine-entry-tool are deliberately not listed here. The
+# installer never runs limine binaries itself, only "arch-chroot /mnt
+# limine-install" against the target's own copy of them (pacstrapped
+# there separately, where a real ESP exists for the package's post-install
+# hook to deploy onto). Depending on them here would pull them into the
+# live image too, where that same hook fails since there's no real ESP.
+depends=(
+  'gtk4'
+  'libadwaita'
+  'python-gobject'
+  'arch-install-scripts'
+  'gptfdisk'
+  'dosfstools'
+  'btrfs-progs'
+  'polkit'
+)
+source=()
+
+package() {
+  install -Dm755 "$startdir/bin/fenrir-installer" "$pkgdir/usr/bin/fenrir-installer"
+  for f in "$startdir"/lib/*.py; do
+    install -Dm644 "$f" "$pkgdir/usr/lib/fenrir-installer/$(basename "$f")"
+  done
+  install -Dm644 "$startdir/fenrir-installer.desktop" \
+    "$pkgdir/usr/share/applications/fenrir-installer.desktop"
+}
