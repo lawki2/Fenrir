@@ -3,5 +3,12 @@
 # in at build time, never pacstrapped onto an installed system), so this
 # only launches on the live ISO, never on an installed system.
 if [ -f /etc/fenrir-packages.x86_64 ]; then
+    # Give the rest of the hyprland.start exec-once batch (Caelestia's own
+    # "caelestia shell -d", keyring/agent/clipboard daemons, etc, all firing
+    # at once) a moment to settle before launching. Without this the
+    # installer's own quickshell instance can win the race to paint first,
+    # showing its hardcoded fallback colours in Colours.qml briefly instead
+    # of the real theme from scheme.json.
+    sleep 2
     exec pkexec-wrapper fenrir-installer
 fi

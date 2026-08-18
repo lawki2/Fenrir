@@ -83,6 +83,17 @@ build_one() {
         # newer, actively rebuilt release with that support, so build against
         # that instead.
         sed -i "s/'quickshell-git'/'quickshell'/" "$build_root/PKGBUILD"
+
+        # Ship Fenrir's own default wallpaper instead of upstream Caelestia's.
+        # Wallpapers.qml's fallback (used whenever no per-user wallpaper state
+        # exists yet, i.e. every fresh live/installed user) is hardcoded to
+        # this exact packaged path with no config override point, so the only
+        # way to change it is to replace the file the package itself installs
+        # — a plain airootfs overlay can't work here since mkarchiso copies
+        # airootfs *before* pacstrap, so pacstrap would just clobber it back.
+        cp "$src_dir/assets/wallpaper.webp" "$build_root/fenrir-wallpaper.webp"
+        sed -i '/DESTDIR="\$pkgdir" cmake --install build/a\    install -Dm644 "$startdir/fenrir-wallpaper.webp" "$pkgdir/etc/xdg/quickshell/caelestia/assets/wallpaper.webp"' \
+            "$build_root/PKGBUILD"
     fi
 
     echo "==> Building $pkg"
