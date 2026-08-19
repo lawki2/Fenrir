@@ -67,10 +67,7 @@ Fenrir's still early. Roughly where it's headed from here:
   instead of a wall of install logs, a quieter boot, and a login screen
   that actually matches the desktop.
 
-Further out: Fenrir hosting its own package repo, so it stops reading as
-"a CachyOS remix" and starts being its own thing properly, and revisiting
-a couple of the remaining third-party apps (terminal, file manager) in
-favour of something more custom.
+Further out: Fenrir hosting its own package repo.
 
 ## Building
 
