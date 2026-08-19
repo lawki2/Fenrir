@@ -28,7 +28,7 @@ same as you would for any early-stage OS.
 
 </div>
 
-## What's different from a normal CachyOS spin
+## What's different
 
 - **Hyprland + Caelestia baked in.** The live image ships the full Caelestia
   shell, dotfiles, and theme already wired up, so both the live session and
