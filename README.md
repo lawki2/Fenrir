@@ -1,25 +1,35 @@
 # Fenrir
 
-A CachyOS-based live/installable ISO that boots straight into a fully
-configured [Hyprland](https://hyprland.org/) + [Caelestia](https://github.com/caelestia-dots)
-desktop, with no manual setup. Built for personal use and a small circle of
-friends rather than general distribution.
+A Linux desktop that's actually finished the moment it boots. Insert the USB,
+install, and you land in a fully themed, fully configured
+[Hyprland](https://hyprland.org/) + [Caelestia](https://github.com/caelestia-dots)
+setup — no dotfiles to hand-edit, no window manager config to piece together
+before it's usable. Tiling done the way it should feel: fast, coherent, and
+genuinely nice to look at, not just functional.
 
-Under the hood it's still CachyOS (kernel, package repos, keyring, hardware
-detection) with a different desktop stack layered on top and its own
-installer, [`fenrir-installer`](fenrir-installer/), replacing Calamares.
+It's a personal project, built for myself and a small circle of friends
+rather than general distribution — so expect rough edges here and there, not
+a polished commercial release with a support line behind it.
+
+Under the hood it's still [CachyOS](https://cachyos.org/) — same kernel,
+same package repos, same hardware support — with a different desktop stack
+layered on top and its own installer, [`fenrir-installer`](fenrir-installer/),
+replacing Calamares.
 
 ## What's different from a normal CachyOS spin
 
 - **Hyprland + Caelestia baked in.** The live image ships the full Caelestia
-  shell, dotfiles, and theme, symlinked into `/etc/skel` with relative paths
-  so both the live user and any account `fenrir-installer` creates land in a
-  working desktop immediately.
-- **A themed, from-scratch installer.** `fenrir-installer` is a small
-  GTK4/libadwaita app that reads Caelestia's live colour scheme and themes
-  itself from it. It only asks what actually needs asking: locale, keyboard,
-  which disk to erase, and a hostname/user/password. No bootloader or
-  desktop chooser, since there's only ever one answer for either.
+  shell, dotfiles, and theme already wired up, so both the live session and
+  any account the installer creates land in a working, styled desktop
+  immediately — not a bare tiling WM you're expected to configure yourself.
+- **A themed installer built to match**, not a generic one bolted on.
+  `fenrir-installer` is a small QML/Quickshell app that reads Caelestia's
+  live colour scheme and themes itself from it in real time, right down to
+  the same fonts, motion, and rounded-corner language as the desktop it's
+  about to set up. It only asks what actually needs asking: locale,
+  keyboard, which disk to erase, and a hostname/user/password — no
+  bootloader or desktop-environment chooser, since there's only ever one
+  answer for either here.
 - **Limine**, silently, as the only bootloader.
 - **AUR packages prebuilt, not built at install time.** Caelestia's AUR-only
   dependencies (`caelestia-cli`, `caelestia-shell`, `caelestia-meta`, and a
@@ -59,27 +69,6 @@ Usage: buildiso.sh [options]
 ```
 
 The finished ISO ends up in `out/fenrir/`.
-
-## Testing in QEMU
-
-```bash
-qemu-system-x86_64 \
-  -enable-kvm -cpu host -m 8G -smp 4 \
-  -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd \
-  -drive if=pflash,format=raw,file=./OVMF_VARS.fd \
-  -drive file="$(command ls -t out/fenrir/*.iso | head -1)",media=cdrom,if=none,id=iso \
-  -device virtio-scsi-pci,id=scsi \
-  -device scsi-cd,drive=iso,bootindex=1 \
-  -drive file=./fenrir-test.qcow2,if=none,id=disk \
-  -device virtio-blk-pci,drive=disk,bootindex=2 \
-  -vga virtio -display gtk
-```
-
-(`OVMF_VARS.fd` needs to be your own writable copy of
-`/usr/share/edk2/x64/OVMF_VARS.4m.fd`, and `fenrir-test.qcow2` a disk image
-created with `qemu-img create -f qcow2 fenrir-test.qcow2 20G`. Using a
-combined `-bios OVMF.4m.fd` instead won't persist the bootloader's NVRAM
-entry between boots.)
 
 ## Attribution
 
