@@ -38,7 +38,7 @@ Item {
             wrapMode: Text.WordWrap
             text: "The selected disk will be completely erased and repartitioned. This cannot be undone."
             color: Colours.m3error
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.normal
         }
 
@@ -65,7 +65,7 @@ Item {
             visible: root.errorVisible
             text: "Select a disk and type ERASE to confirm."
             color: Colours.m3error
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.small
         }
 

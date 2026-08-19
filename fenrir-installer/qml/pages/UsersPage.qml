@@ -27,7 +27,7 @@ Item {
         Text {
             text: "Hostname and user account"
             color: Colours.m3outline
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.normal
         }
 
@@ -65,7 +65,7 @@ Item {
             visible: root.errorVisible
             text: "Fill in every field; the two passwords must match."
             color: Colours.m3error
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.small
         }
 

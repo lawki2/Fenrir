@@ -15,7 +15,7 @@ TextField {
     id: root
 
     color: Colours.m3onSurface
-    font.family: "Rubik"
+    font.family: Fonts.sans
     font.pointSize: TokenConfig.appearance.fontSize.normal
     renderType: echoMode === TextField.Password ? TextInput.QtRendering : TextInput.NativeRendering
     selectionColor: Qt.alpha(Colours.m3primary, 0.4)

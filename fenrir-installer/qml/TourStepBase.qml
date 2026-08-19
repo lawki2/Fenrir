@@ -24,7 +24,7 @@ Item {
             wrapMode: Text.WordWrap
             text: root.stepTitle
             color: Colours.m3onSurface
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.extraLarge
             font.bold: true
         }
@@ -35,7 +35,7 @@ Item {
             wrapMode: Text.WordWrap
             text: root.body
             color: Colours.m3outline
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.normal
         }
 

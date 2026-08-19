@@ -20,7 +20,7 @@ Item {
         Text {
             text: "Timezone and system language"
             color: Colours.m3outline
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.normal
         }
 

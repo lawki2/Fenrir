@@ -20,7 +20,7 @@ Item {
         Text {
             text: root.statusText
             color: Colours.m3onSurface
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.large
             font.bold: true
         }
@@ -45,7 +45,7 @@ Item {
                     width: flick.width
                     wrapMode: Text.Wrap
                     color: Colours.m3onSurface
-                    font.family: "CaskaydiaCove NF"
+                    font.family: Fonts.mono
                     font.pointSize: TokenConfig.appearance.fontSize.small
                 }
 

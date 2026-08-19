@@ -26,7 +26,7 @@ Rectangle {
         anchors.centerIn: parent
         text: root.text
         color: root.accent ? Colours.m3onPrimary : Colours.m3onSurface
-        font.family: "Rubik"
+        font.family: Fonts.sans
         font.pointSize: TokenConfig.appearance.fontSize.normal
     }
 

@@ -35,7 +35,7 @@ Rectangle {
         Text {
             text: root.label
             color: Colours.m3onSurface
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.normal
         }
 
@@ -45,7 +45,7 @@ Rectangle {
             Layout.maximumWidth: 220
             text: root.value
             color: Colours.m3outline
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.normal
             elide: Text.ElideRight
             horizontalAlignment: Text.AlignRight
@@ -54,7 +54,7 @@ Rectangle {
         Text {
             text: "›"
             color: Colours.m3outline
-            font.family: "Rubik"
+            font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.large
         }
     }

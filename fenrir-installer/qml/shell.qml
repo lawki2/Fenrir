@@ -48,7 +48,7 @@ FloatingWindow {
             Text {
                 text: "Install Fenrir"
                 color: Colours.m3onSurface
-                font.family: "Rubik"
+                font.family: Fonts.sans
                 font.pointSize: TokenConfig.appearance.fontSize.large
                 font.bold: true
                 Layout.fillWidth: true
@@ -187,7 +187,7 @@ FloatingWindow {
                     horizontalAlignment: Text.AlignHCenter
                     text: Picker.title
                     color: Colours.m3onSurface
-                    font.family: "Rubik"
+                    font.family: Fonts.sans
                     font.pointSize: TokenConfig.appearance.fontSize.large
                     font.bold: true
                 }
@@ -230,7 +230,7 @@ FloatingWindow {
                         elide: Text.ElideRight
                         text: optionDelegate.modelData
                         color: optionDelegate.modelData === Picker.selected ? Colours.m3onPrimary : Colours.m3onSurface
-                        font.family: "Rubik"
+                        font.family: Fonts.sans
                         font.pointSize: TokenConfig.appearance.fontSize.normal
                     }
 
