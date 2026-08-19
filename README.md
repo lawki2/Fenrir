@@ -87,3 +87,5 @@ The finished ISO ends up in `out/fenrir/`.
 Fenrir is built on top of [CachyOS](https://cachyos.org/) and bundles
 [Caelestia](https://github.com/caelestia-dots)'s dotfiles and shell. See
 [THIRD_PARTY.md](THIRD_PARTY.md) for licensing details.
+
+Built with the help of AI tools, mainly [Claude](https://claude.com).
