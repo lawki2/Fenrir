@@ -11,8 +11,8 @@ Rectangle {
     property string label
 
     implicitHeight: 56
-    radius: TokenConfig.appearance.rounding.small
-    color: Colours.m3surfaceContainerHigh
+    radius: TokenConfig.appearance.rounding.normal
+    color: Colours.m3surfaceContainerLow
 
     RowLayout {
         anchors.fill: parent

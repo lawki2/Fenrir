@@ -10,12 +10,17 @@ FloatingWindow {
 
     implicitWidth: 780
     implicitHeight: 560
-    title: "Install Fenrir"
+    title: root.currentPage === "welcome" || root.currentPage.startsWith("tour") ? "Welcome to Fenrir" : "Install Fenrir"
     color: Colours.m3surface
 
-    readonly property var pageOrder: ["locale", "keyboard", "partition", "users", "progress"]
+    readonly property var pageOrder: [
+        "welcome",
+        "tour-launcher", "tour-close", "tour-float", "tour-move", "tour-workspaces",
+        "locale", "keyboard", "partition", "users", "progress",
+    ]
     property int pageIndex: 0
     readonly property string currentPage: pageOrder[pageIndex]
+    readonly property bool showHeader: currentPage !== "welcome" && !currentPage.startsWith("tour") && currentPage !== "progress"
 
     // Collected as the user moves forward through the pages, sent to
     // cli.py's install command as JSON once they hit Install.
@@ -38,6 +43,7 @@ FloatingWindow {
 
         RowLayout {
             Layout.fillWidth: true
+            visible: root.showHeader
 
             Text {
                 text: "Install Fenrir"
@@ -50,14 +56,16 @@ FloatingWindow {
 
             NavButton {
                 text: "Back"
-                visible: root.pageIndex > 0 && root.currentPage !== "progress"
+                // Nothing before "locale" should offer Back — welcome and
+                // every tour step have their own dedicated buttons instead,
+                // and their pages are hidden via showHeader anyway.
+                visible: root.pageIndex > root.pageOrder.indexOf("locale")
                 onClicked: root.pageIndex -= 1
             }
 
             NavButton {
                 id: nextButton
                 text: root.currentPage === "users" ? "Install" : "Next"
-                visible: root.currentPage !== "progress"
                 accent: true
                 onClicked: root.advance()
             }
@@ -68,6 +76,12 @@ FloatingWindow {
             Layout.fillWidth: true
             Layout.fillHeight: true
             source: `pages/${{
+                welcome: "WelcomePage",
+                "tour-launcher": "TourLauncher",
+                "tour-close": "TourClose",
+                "tour-float": "TourFloat",
+                "tour-move": "TourMove",
+                "tour-workspaces": "TourWorkspaces",
                 locale: "LocalePage",
                 keyboard: "KeyboardPage",
                 partition: "PartitionPage",
@@ -104,6 +118,29 @@ FloatingWindow {
             Behavior on scale {
                 enabled: !pageLoader.resetting
                 Anim {}
+            }
+
+            Connections {
+                target: pageLoader.item
+                ignoreUnknownSignals: true
+
+                // WelcomePage's "skip" jumps straight past every tour step.
+                // WelcomePage's "tour" and every TourStepBase's "next" both
+                // just advance one step — since the tour steps are a
+                // contiguous run in pageOrder immediately followed by
+                // "locale", the last step's "next" naturally spills over
+                // into the real installer flow with no special-casing.
+                function onSkip(): void {
+                    root.pageIndex = root.pageOrder.indexOf("locale");
+                }
+
+                function onTour(): void {
+                    root.pageIndex += 1;
+                }
+
+                function onNext(): void {
+                    root.pageIndex += 1;
+                }
             }
         }
     }
@@ -237,41 +274,5 @@ FloatingWindow {
         }
 
         root.pageIndex += 1;
-    }
-
-    component NavButton: Rectangle {
-        id: btn
-
-        property string text
-        property bool accent: false
-        signal clicked()
-
-        Layout.preferredHeight: 36
-        Layout.preferredWidth: label.implicitWidth + TokenConfig.appearance.padding.large * 2
-        radius: TokenConfig.appearance.rounding.small
-        color: accent ? Colours.m3primary : "transparent"
-
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            color: Colours.m3onSurface
-            opacity: mouse.pressed ? 0.1 : mouse.containsMouse ? 0.08 : 0
-        }
-
-        Text {
-            id: label
-            anchors.centerIn: parent
-            text: btn.text
-            color: btn.accent ? Colours.m3onPrimary : Colours.m3onSurface
-            font.family: "Rubik"
-            font.pointSize: TokenConfig.appearance.fontSize.normal
-        }
-
-        MouseArea {
-            id: mouse
-            anchors.fill: parent
-            hoverEnabled: true
-            onClicked: btn.clicked()
-        }
     }
 }
