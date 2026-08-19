@@ -22,8 +22,7 @@ replacing Calamares.
 
 `fenrir-linux-260819.iso` — `sha256: 8977886c5de19e4c956be827dbefe880a8dbf21695c5736521992ecd96a0110c`
 
-**Early alpha.** This has had one real install tested end-to-end, not
-hundreds. Expect rough edges, missing polish, and the occasional bug —
+**Early alpha.** This is an early build. Expect rough edges, missing polish, and the occasional bug —
 back up anything you care about before installing, same as you would for
 any early-stage OS.
 
