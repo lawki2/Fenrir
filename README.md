@@ -16,6 +16,14 @@ same package repos, same hardware support — with a different desktop stack
 layered on top and its own installer, [`fenrir-installer`](fenrir-installer/),
 replacing Calamares.
 
+<div align="center">
+
+[![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://mega.nz/file/q34VGBjS#okXNEUtizyZKU98HJEBA72q0AGTueBOKOmlxgWf_MY8)
+
+`fenrir-linux-260819.iso` — `sha256: 8977886c5de19e4c956be827dbefe880a8dbf21695c5736521992ecd96a0110c`
+
+</div>
+
 ## What's different from a normal CachyOS spin
 
 - **Hyprland + Caelestia baked in.** The live image ships the full Caelestia
