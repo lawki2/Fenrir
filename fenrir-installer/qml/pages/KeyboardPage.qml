@@ -14,11 +14,11 @@ Item {
         anchors.fill: parent
         spacing: TokenConfig.appearance.spacing.large
 
-        Text {
+        SectionHeading {
+            Layout.topMargin: TokenConfig.appearance.spacing.large
+            Layout.bottomMargin: TokenConfig.appearance.spacing.large
+            icon: "keyboard"
             text: "Keyboard layout"
-            color: Colours.m3outline
-            font.family: Fonts.sans
-            font.pointSize: TokenConfig.appearance.fontSize.normal
         }
 
         SelectField {

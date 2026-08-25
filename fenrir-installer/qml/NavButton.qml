@@ -14,13 +14,6 @@ Rectangle {
     radius: TokenConfig.appearance.rounding.small
     color: accent ? Colours.m3primary : "transparent"
 
-    Rectangle {
-        anchors.fill: parent
-        radius: parent.radius
-        color: Colours.m3onSurface
-        opacity: mouse.pressed ? 0.1 : mouse.containsMouse ? 0.08 : 0
-    }
-
     Text {
         id: label
         anchors.centerIn: parent
@@ -30,10 +23,9 @@ Rectangle {
         font.pointSize: TokenConfig.appearance.fontSize.normal
     }
 
-    MouseArea {
-        id: mouse
-        anchors.fill: parent
-        hoverEnabled: true
+    StateLayer {
+        radius: root.radius
+        color: root.accent ? Colours.palette.m3onPrimary : Colours.palette.m3onSurface
         onClicked: root.clicked()
     }
 }

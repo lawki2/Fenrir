@@ -213,14 +213,6 @@ FloatingWindow {
                     radius: TokenConfig.appearance.rounding.small
                     color: optionDelegate.modelData === Picker.selected ? Colours.m3primary : Colours.m3surfaceContainerHigh
 
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: parent.radius
-                        color: Colours.m3onSurface
-                        visible: optionDelegate.modelData !== Picker.selected
-                        opacity: optionMouse.pressed ? 0.1 : optionMouse.containsMouse ? 0.08 : 0
-                    }
-
                     Text {
                         anchors.left: parent.left
                         anchors.right: parent.right
@@ -234,10 +226,9 @@ FloatingWindow {
                         font.pointSize: TokenConfig.appearance.fontSize.normal
                     }
 
-                    MouseArea {
-                        id: optionMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
+                    StateLayer {
+                        visible: optionDelegate.modelData !== Picker.selected
+                        radius: parent.radius
                         onClicked: Picker.pick(optionDelegate.modelData)
                     }
                 }

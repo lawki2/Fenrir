@@ -15,13 +15,13 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: TokenConfig.appearance.spacing.large
+        spacing: TokenConfig.appearance.spacing.small
 
-        Text {
+        SectionHeading {
+            Layout.topMargin: TokenConfig.appearance.spacing.large
+            Layout.bottomMargin: TokenConfig.appearance.spacing.large
+            icon: "translate"
             text: "Timezone and system language"
-            color: Colours.m3outline
-            font.family: Fonts.sans
-            font.pointSize: TokenConfig.appearance.fontSize.normal
         }
 
         SelectField {
@@ -29,6 +29,8 @@ Item {
             value: root.selectedTimezone
             options: timezoneProc.exited ? timezoneProc.lines : [root.defaultTimezone]
             Layout.fillWidth: true
+            first: true
+            last: false
             onPicked: value => root.selectedTimezone = value
         }
 
@@ -37,6 +39,8 @@ Item {
             value: root.selectedLocale
             options: localeFile.loaded ? root.parseLocales(localeFile.text()) : [root.defaultLocale]
             Layout.fillWidth: true
+            first: false
+            last: true
             onPicked: value => root.selectedLocale = value
         }
 

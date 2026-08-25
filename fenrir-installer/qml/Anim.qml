@@ -14,14 +14,19 @@ NumberAnimation {
 
     enum Type {
         Standard,
-        DefaultSpatial
+        DefaultSpatial,
+        SlowEffects
     }
 
     property int type: Anim.Standard
 
-    duration: root.type === Anim.DefaultSpatial
-        ? TokenConfig.appearance.animDurations.expressiveDefaultSpatial
-        : TokenConfig.appearance.animDurations.normal
+    duration: {
+        if (root.type === Anim.DefaultSpatial)
+            return TokenConfig.appearance.animDurations.expressiveDefaultSpatial;
+        if (root.type === Anim.SlowEffects)
+            return TokenConfig.appearance.animDurations.expressiveSlowEffects;
+        return TokenConfig.appearance.animDurations.normal;
+    }
 
     easing.type: Easing.BezierSpline
     easing.bezierCurve: root.type === Anim.DefaultSpatial

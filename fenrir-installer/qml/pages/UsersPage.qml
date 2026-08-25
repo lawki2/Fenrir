@@ -22,46 +22,55 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: TokenConfig.appearance.spacing.normal
+        spacing: TokenConfig.appearance.spacing.large
 
-        Text {
+        SectionHeading {
+            Layout.topMargin: TokenConfig.appearance.spacing.large
+            Layout.bottomMargin: TokenConfig.appearance.spacing.large
+            icon: "person"
             text: "Hostname and user account"
-            color: Colours.m3outline
-            font.family: Fonts.sans
-            font.pointSize: TokenConfig.appearance.fontSize.normal
         }
 
-        LabelledField {
-            label: "Hostname"
+        StyledTextField {
+            id: hostnameField
             Layout.fillWidth: true
-            StyledTextField { id: hostnameField; anchors.fill: parent; text: "fenrir"; onTextChanged: root.errorVisible = false }
+            placeholderText: "Hostname"
+            text: "fenrir"
+            onTextChanged: root.errorVisible = false
         }
 
-        LabelledField {
-            label: "Full name"
+        StyledTextField {
+            id: fullNameField
             Layout.fillWidth: true
-            StyledTextField { id: fullNameField; anchors.fill: parent; onTextChanged: root.errorVisible = false }
+            placeholderText: "Full name"
+            onTextChanged: root.errorVisible = false
         }
 
-        LabelledField {
-            label: "Username"
+        StyledTextField {
+            id: usernameField
             Layout.fillWidth: true
-            StyledTextField { id: usernameField; anchors.fill: parent; onTextChanged: root.errorVisible = false }
+            placeholderText: "Username"
+            onTextChanged: root.errorVisible = false
         }
 
-        LabelledField {
-            label: "Password"
+        StyledTextField {
+            id: passwordField
             Layout.fillWidth: true
-            StyledTextField { id: passwordField; anchors.fill: parent; echoMode: TextInput.Password; onTextChanged: root.errorVisible = false }
+            placeholderText: "Password"
+            echoMode: TextInput.Password
+            onTextChanged: root.errorVisible = false
         }
 
-        LabelledField {
-            label: "Confirm password"
+        StyledTextField {
+            id: confirmField
             Layout.fillWidth: true
-            StyledTextField { id: confirmField; anchors.fill: parent; echoMode: TextInput.Password; onTextChanged: root.errorVisible = false }
+            placeholderText: "Confirm password"
+            echoMode: TextInput.Password
+            onTextChanged: root.errorVisible = false
         }
 
         Text {
+            Layout.topMargin: TokenConfig.appearance.spacing.small
             visible: root.errorVisible
             text: "Fill in every field; the two passwords must match."
             color: Colours.m3error

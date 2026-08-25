@@ -33,8 +33,15 @@ Item {
         anchors.fill: parent
         spacing: TokenConfig.appearance.spacing.large
 
+        SectionHeading {
+            Layout.topMargin: TokenConfig.appearance.spacing.large
+            icon: "storage"
+            text: "Disk setup"
+        }
+
         Text {
             Layout.fillWidth: true
+            Layout.bottomMargin: TokenConfig.appearance.spacing.large
             wrapMode: Text.WordWrap
             text: "The selected disk will be completely erased and repartitioned. This cannot be undone."
             color: Colours.m3error
@@ -50,15 +57,11 @@ Item {
             onPicked: value => root.selectedDiskLabel = value
         }
 
-        LabelledField {
-            label: `Type "${root.confirmText}" to confirm`
+        StyledTextField {
+            id: confirmField
             Layout.fillWidth: true
-
-            StyledTextField {
-                id: confirmField
-                anchors.fill: parent
-                onTextChanged: root.errorVisible = false
-            }
+            placeholderText: `Type "${root.confirmText}" to confirm`
+            onTextChanged: root.errorVisible = false
         }
 
         Text {
