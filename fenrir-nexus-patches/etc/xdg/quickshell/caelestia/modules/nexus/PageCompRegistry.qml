@@ -10,6 +10,7 @@ import qs.modules.nexus.pages
 import qs.modules.nexus.pages.apps
 import qs.modules.nexus.pages.audio
 import qs.modules.nexus.pages.bluetooth
+import qs.modules.nexus.pages.keybinds
 import qs.modules.nexus.pages.monitors
 import qs.modules.nexus.pages.network
 import qs.modules.nexus.pages.panels
@@ -147,6 +148,14 @@ QtObject {
                 }
                 Component {
                     BarClock {}
+                }
+            }
+        },
+        Component {
+            // Keybinds
+            StackPage {
+                Component {
+                    KeybindsPage {}
                 }
             }
         },

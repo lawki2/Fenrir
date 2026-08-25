@@ -102,4 +102,11 @@ return {
     kbShowPanels               = "SUPER + K",
     kbLock                     = "SUPER + L",
     kbRestoreLock              = "SUPER + ALT + L",
+
+    -- Screenshot/clipboard (promoted from hardcoded literals so Nexus's
+    -- Keybinds page can rebind them via the existing hypr-vars.lua
+    -- override mechanism, same as every other kbXxx entry above)
+    kbScreenshot               = "Print",
+    kbClipboard                = "SUPER + V",
+    kbEmoji                    = "SUPER + Period",
 }

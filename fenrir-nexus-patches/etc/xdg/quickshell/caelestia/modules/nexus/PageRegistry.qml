@@ -63,6 +63,12 @@ QtObject {
             category: "shell"
         },
         {
+            label: qsTr("Keybinds"),
+            icon: "keyboard",
+            description: qsTr("Rebind Hyprland shortcuts"),
+            category: "shell"
+        },
+        {
             label: qsTr("Apps"),
             icon: "apps",
             description: qsTr("Default apps, favourites, hidden apps"),

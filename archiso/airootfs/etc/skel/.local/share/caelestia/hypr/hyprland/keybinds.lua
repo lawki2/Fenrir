@@ -139,7 +139,7 @@ hl.bind(vars.kbFileExplorer, hl.dsp.exec_cmd(vars.fileExplorer))
 hl.bind("CTRL + ALT + V", hl.dsp.exec_cmd(vars.audioSettings))
 
 -- Utilities
-hl.bind("Print", hl.dsp.exec_cmd("caelestia screenshot"), { locked = true })
+hl.bind(vars.kbScreenshot, hl.dsp.exec_cmd("caelestia screenshot"), { locked = true })
 hl.bind("SUPER + SHIFT + S", hl.dsp.global("caelestia:screenshotFreeze"))
 hl.bind("SUPER + SHIFT + ALT + S", hl.dsp.global("caelestia:screenshot"))
 hl.bind("SUPER + ALT + R", hl.dsp.exec_cmd("caelestia record -s"))
@@ -171,9 +171,9 @@ hl.bind(
 hl.bind("SUPER + SHIFT + L", hl.dsp.exec_cmd(vars.sleepGestureCmd), { locked = true })
 
 -- Clipboard and emoji picker
-hl.bind("SUPER + V", hl.dsp.exec_cmd("pkill fuzzel || caelestia clipboard"))
+hl.bind(vars.kbClipboard, hl.dsp.exec_cmd("pkill fuzzel || caelestia clipboard"))
 hl.bind("SUPER + ALT + V", hl.dsp.exec_cmd("pkill fuzzel || caelestia clipboard -d"))
-hl.bind("SUPER + Period", hl.dsp.exec_cmd("pkill fuzzel || caelestia emoji -p"))
+hl.bind(vars.kbEmoji, hl.dsp.exec_cmd("pkill fuzzel || caelestia emoji -p"))
 hl.bind(
     "CTRL + SHIFT + ALT + V",
     hl.dsp.exec_cmd('sleep 0.5s && ydotool type -d 1 "$(cliphist list | head -1 | cliphist decode)"'),
