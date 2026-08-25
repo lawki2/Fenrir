@@ -28,6 +28,12 @@ QtObject {
             category: "connectivity"
         },
         {
+            label: qsTr("Firewall"),
+            icon: "security",
+            description: qsTr("Block unsolicited incoming connections"),
+            category: "connectivity"
+        },
+        {
             label: qsTr("Connected devices"),
             icon: "devices_other",
             description: qsTr("Bluetooth, pairing"),

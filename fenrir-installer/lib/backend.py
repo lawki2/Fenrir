@@ -266,13 +266,36 @@ def finalize_bootloader(progress):
     _chroot(["limine-update"], progress)
 
 
-ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "sddm")
+ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "sddm", "ufw")
 
 
 def enable_services(progress):
     for service in ENABLED_SERVICES:
         progress(f"Enabling {service}")
         _chroot(["systemctl", "enable", service], progress)
+
+
+def configure_firewall(progress):
+    # ufw ships with ENABLED=no until someone runs `ufw enable` - flip that
+    # directly rather than running `ufw enable` inside the chroot, since
+    # that also tries to apply the ruleset through netfilter immediately,
+    # which is chroot state best left to the installed system's own first
+    # real boot (where ufw.service, enabled above, applies it). Package
+    # defaults otherwise (deny incoming, allow outgoing, deny forward, in
+    # /etc/default/ufw) are left untouched - that's the standard policy.
+    progress("Enabling firewall")
+    (TARGET / "etc/ufw/ufw.conf").write_text(
+        "# /etc/ufw/ufw.conf\n"
+        "#\n"
+        "\n"
+        "# Set to yes to start on boot. If setting this remotely, be sure to add a rule\n"
+        "# to allow your remote connection before starting ufw. Eg: 'ufw allow 22/tcp'\n"
+        "ENABLED=yes\n"
+        "\n"
+        "# Please use the 'ufw' command to set the loglevel. Eg: 'ufw logging medium'.\n"
+        "# See 'man ufw' for details.\n"
+        "LOGLEVEL=low\n"
+    )
 
 
 def unmount_target(progress):
@@ -306,5 +329,6 @@ def run_install(plan: InstallPlan, progress):
     configure_kernel_cmdline(root_part, progress)
     finalize_bootloader(progress)
     enable_services(progress)
+    configure_firewall(progress)
     unmount_target(progress)
     progress("Install complete")

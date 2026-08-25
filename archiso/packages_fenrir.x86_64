@@ -203,6 +203,10 @@ thunar
 quickshell
 pamac-aur
 
+# Security. Enabled by default with its standard policy at install time,
+# see fenrir-installer/lib/backend.py's configure_firewall().
+ufw
+
 # AUR built packages, see build-local-repo.sh and local-repo.
 qtengine
 app2unit
