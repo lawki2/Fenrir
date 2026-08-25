@@ -18,6 +18,23 @@ independent_aur_pkgs=(qtengine app2unit python-materialyoucolor libcava ttf-rubi
 # Depends on packages built in the previous stage.
 caelestia_aur_pkgs=(caelestia-cli caelestia-shell)
 
+# Pin the Caelestia stack to known-good AUR commits instead of always
+# building whatever's currently latest - the "sync deliberately" half of
+# the Caelestia update policy (see fenrir_roadmap.md) was previously just
+# a stated intent with nothing in this script actually enforcing it, which
+# let an unpinned `git clone --depth 1` silently pull caelestia-shell
+# 2.3.0 over this dev machine's 2.2.0 and break fenrir-nexus-patches'
+# Toggles.qml (Config.utilities.quickToggles's type changed between those
+# versions). These two hashes are exactly what was built, fixed, and
+# confirmed to diff cleanly against fenrir-nexus-patches/ on 2026-08-24 -
+# bump them deliberately (and re-diff every overlay file that copies a
+# real upstream file against the new tarball) when there's a real reason
+# to take a newer version, never by just deleting this pin.
+declare -A pinned_aur_commits=(
+    [caelestia-cli]="58f0b55e2231476b01ddfb829d20b6fb474b1f1a"   # 1.1.2
+    [caelestia-shell]="0b4bd59c6043fa838c62d00f6fa9457f788c263f" # 2.3.0
+)
+
 repo_db="${repo_dir}/${repo_name}.db.tar.gz"
 
 ensure_repo_db() {
@@ -69,7 +86,15 @@ build_one() {
 
     rm -rf "$build_root"
     if [[ "$src" == "aur" ]]; then
-        git clone --depth 1 "https://aur.archlinux.org/${pkg}.git" "$build_root"
+        if [[ -n "${pinned_aur_commits[$pkg]:-}" ]]; then
+            # Pinned packages need full history to check out an arbitrary
+            # older commit - these repos are tiny (a PKGBUILD + a patch or
+            # two), so the extra clone cost is negligible.
+            git clone "https://aur.archlinux.org/${pkg}.git" "$build_root"
+            git -C "$build_root" checkout "${pinned_aur_commits[$pkg]}"
+        else
+            git clone --depth 1 "https://aur.archlinux.org/${pkg}.git" "$build_root"
+        fi
     else
         mkdir -p "$build_root"
         cp -r "$src"/* "$build_root"/
@@ -93,6 +118,16 @@ build_one() {
         # airootfs *before* pacstrap, so pacstrap would just clobber it back.
         cp "$src_dir/assets/wallpaper.webp" "$build_root/fenrir-wallpaper.webp"
         sed -i '/DESTDIR="\$pkgdir" cmake --install build/a\    install -Dm644 "$startdir/fenrir-wallpaper.webp" "$pkgdir/etc/xdg/quickshell/caelestia/assets/wallpaper.webp"' \
+            "$build_root/PKGBUILD"
+
+        # Overlay Fenrir's own Nexus settings-page additions (new/modified
+        # QML under fenrir-nexus-patches/, tracked in this repo, authored
+        # and verified against real upstream files - never generated from
+        # scratch) on top of the freshly cmake-installed tree, same
+        # "insert right after DESTDIR=... cmake --install build" anchor as
+        # the wallpaper install above.
+        cp -r "$src_dir/fenrir-nexus-patches/etc" "$build_root/fenrir-nexus-etc"
+        sed -i '/DESTDIR="\$pkgdir" cmake --install build/a\    cp -rv "$startdir/fenrir-nexus-etc/." "$pkgdir/etc/"' \
             "$build_root/PKGBUILD"
     fi
 
