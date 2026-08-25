@@ -183,6 +183,7 @@ qt6-wayland
 xdg-desktop-portal-hyprland
 xdg-desktop-portal-gtk
 hyprpicker
+wlsunset
 wl-clipboard
 cliphist
 trash-cli
