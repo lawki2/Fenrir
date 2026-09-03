@@ -7,9 +7,10 @@ setup, with no dotfiles to hand-edit and no window manager config to piece
 together before it's usable. Tiling done the way it should feel: fast,
 coherent, and genuinely nice to look at, not just functional.
 
-It's a personal project, built for myself and a small circle of friends
-rather than general distribution, so expect rough edges here and there, not
-a polished commercial release with a support line behind it.
+It started as a personal project and is still early, so expect rough edges
+here and there — this isn't a polished commercial release with a support
+line behind it. Bug reports, feedback, and contributions are welcome; see
+[Contributing](#contributing) below.
 
 Under the hood it's still [CachyOS](https://cachyos.org/) (same kernel, same
 package repos, same hardware support) with a different desktop stack layered
@@ -102,10 +103,17 @@ Usage: buildiso.sh [options]
 
 The finished ISO ends up in `out/fenrir/`.
 
+## Contributing
+
+Bug reports, feedback, and pull requests are all welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md) for how the project's laid out and how
+to get a change reviewed. If you just want to try it and say what broke.
+
 ## Attribution
 
 Fenrir is built on top of [CachyOS](https://cachyos.org/) and bundles
 [Caelestia](https://github.com/caelestia-dots)'s dotfiles and shell. See
-[THIRD_PARTY.md](THIRD_PARTY.md) for licensing details.
+[THIRD_PARTY.md](THIRD_PARTY.md) for licensing details on those. Fenrir's
+own code is licensed under [GPL-3.0](LICENSE).
 
 Built with the help of AI tools, mainly [Claude](https://claude.com).
