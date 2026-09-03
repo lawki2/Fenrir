@@ -1,7 +1,7 @@
 # Maintainer: Fenrir
 pkgname=fenrir-installer
 pkgver=1.0.0
-pkgrel=11
+pkgrel=12
 pkgdesc="Fenrir's themed QML/Quickshell installer"
 arch=('x86_64')
 license=('GPL-3.0-only')
@@ -38,4 +38,9 @@ package() {
 
   install -Dm644 "$startdir/fenrir-installer.desktop" \
     "$pkgdir/usr/share/applications/fenrir-installer.desktop"
+
+  # Scoped to ufw specifically (not pkexec's shared generic action) so
+  # auth_admin_keep only affects Firewall page calls, not all pkexec uses.
+  install -Dm644 "$startdir/org.fenrir.ufw.policy" \
+    "$pkgdir/usr/share/polkit-1/actions/org.fenrir.ufw.policy"
 }

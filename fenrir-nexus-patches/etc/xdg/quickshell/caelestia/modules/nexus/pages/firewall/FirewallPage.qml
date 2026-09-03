@@ -32,6 +32,12 @@ PageBase {
     property bool rulesLoadFailed: false
     property var rules: []
     property string newRuleSpec: ""
+    // Shared across toggle/add/delete since the busy-guards below mean at
+    // most one of those can ever be in flight at a time - a cancelled
+    // pkexec prompt or an invalid rule spec used to just silently refresh
+    // back to the unchanged state with nothing telling the user their
+    // click didn't do what they expected.
+    property string actionError: ""
 
     function refreshStatus(): void {
         statusProc.running = true;
@@ -44,11 +50,15 @@ PageBase {
     }
 
     function setEnabled(on: bool): void {
+        if (toggleProc.running)
+            return;
         toggleProc.command = ["pkexec", "ufw", "--force", on ? "enable" : "disable"];
         toggleProc.running = true;
     }
 
     function addRule(spec: string, allow: bool): void {
+        if (ruleActionProc.running)
+            return;
         const trimmed = spec.trim();
         if (!trimmed.length)
             return;
@@ -58,6 +68,8 @@ PageBase {
     }
 
     function deleteRule(number: int): void {
+        if (ruleActionProc.running)
+            return;
         ruleActionProc.command = ["pkexec", "ufw", "--force", "delete", String(number)];
         ruleActionProc.running = true;
     }
@@ -75,11 +87,19 @@ PageBase {
             if (!m)
                 continue;
             const cols = m[2].trim().split(/\s{2,}/);
+            // A future ufw version reflowing its column widths (e.g.
+            // single-space padding for a long port range) could otherwise
+            // silently produce a wrong to/action/from split instead of
+            // just dropping the row - requiring the expected column count
+            // and a real ufw action keyword in the action slot turns that
+            // into "skip this line" instead of "display wrong data".
+            if (cols.length < 3 || !/^(ALLOW|DENY|REJECT|LIMIT)/.test(cols[1]))
+                continue;
             result.push({
                 number: parseInt(m[1], 10),
-                to: cols[0] ?? "",
-                action: cols[1] ?? "",
-                from: cols[2] ?? ""
+                to: cols[0],
+                action: cols[1],
+                from: cols[2]
             });
         }
         root.rules = result;
@@ -114,7 +134,10 @@ PageBase {
 
         Process {
             id: toggleProc
-            onExited: root.refreshStatus()
+            onExited: exitCode => {
+                root.actionError = exitCode === 0 ? "" : qsTr("Couldn't change the firewall state — the password prompt may have been cancelled.");
+                root.refreshStatus();
+            }
         }
 
         Process {
@@ -137,7 +160,10 @@ PageBase {
 
         Process {
             id: ruleActionProc
-            onExited: root.refreshRules()
+            onExited: exitCode => {
+                root.actionError = exitCode === 0 ? "" : qsTr("Couldn't apply that — check the port/service format, or the password prompt may have been cancelled.");
+                root.refreshRules();
+            }
         }
 
         SectionHeader {
@@ -153,6 +179,17 @@ PageBase {
             subtext: qsTr("Blocks unsolicited incoming connections; outgoing traffic is unaffected")
             checked: root.ufwEnabled
             onToggled: root.setEnabled(checked)
+        }
+
+        StyledText {
+            visible: root.actionError.length > 0
+            Layout.fillWidth: true
+            Layout.leftMargin: Tokens.padding.largeIncreased
+            Layout.rightMargin: Tokens.padding.largeIncreased
+            wrapMode: Text.WordWrap
+            text: root.actionError
+            color: Colours.palette.m3error
+            font: Tokens.font.body.small
         }
 
         SectionHeader {
@@ -235,6 +272,7 @@ PageBase {
                         implicitWidth: 32
                         implicitHeight: 32
                         radius: height / 2
+                        disabled: ruleActionProc.running
                         onClicked: root.deleteRule(ruleRow.modelData.number)
 
                         MaterialIcon {
@@ -268,6 +306,7 @@ PageBase {
             spacing: Tokens.spacing.small
 
             ActionButton {
+                disabled: ruleActionProc.running
                 text: qsTr("Allow")
                 bg: Colours.palette.m3primaryContainer
                 fg: Colours.palette.m3onPrimaryContainer
@@ -275,6 +314,7 @@ PageBase {
             }
 
             ActionButton {
+                disabled: ruleActionProc.running
                 text: qsTr("Deny")
                 bg: Colours.palette.m3errorContainer
                 fg: Colours.palette.m3onErrorContainer
