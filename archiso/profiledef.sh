@@ -28,7 +28,6 @@ file_permissions=(
   ["/usr/local/bin/choose-mirror"]="0:0:755"
   ["/usr/local/bin/dmcheck"]="0:0:755"
   ["/usr/local/bin/remove-nvidia"]="0:0:755"
-  ["/usr/local/bin/prepare-live-desktop.sh"]="0:0:755"
   ["/usr/local/bin/nvidia-module-loader"]="0:0:755"
   ["/usr/local/bin/pkexec-wrapper"]="0:0:755"
   ["/usr/local/bin/fenrir-installer-autostart"]="0:0:755"
