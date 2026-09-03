@@ -10,3 +10,7 @@ Fenrir bundles or depends on the following third-party projects.
   various licenses, see each package's own upstream repository.
 - **Limine** (bootloader): BSD-2-Clause, from https://limine-bootloader.org/.
 - **limine-mkinitcpio-hook**: GPL-3.0, from https://gitlab.com/Zesko/limine-entry-tool.
+- **Default wallpaper** (`assets/wallpaper.webp`): photo by Maria Lupan on
+  [Unsplash](https://unsplash.com/photos/0IFvTeguMJs), used under the
+  [Unsplash License](https://unsplash.com/license) (free for commercial
+  use, no attribution required).
