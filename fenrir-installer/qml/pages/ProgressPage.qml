@@ -39,6 +39,7 @@ Item {
     ]
 
     property int currentStep: 0
+    property string pendingLog: ""
 
     function checkStep(line: string): void {
         for (let i = root.currentStep; i < root.stepTriggers.length; i++) {
@@ -172,15 +173,33 @@ Item {
         }
     }
 
+    // Appending every line straight to logText.text forces a full text
+    // relayout each time; buffer and flush a few times a second instead.
+    Timer {
+        interval: 150
+        repeat: true
+        running: installProc.running
+        onTriggered: {
+            if (root.pendingLog.length > 0) {
+                logText.text += root.pendingLog;
+                root.pendingLog = "";
+            }
+        }
+    }
+
     Process {
         id: installProc
         stdout: SplitParser {
             onRead: data => {
-                logText.text += data + "\n";
+                root.pendingLog += data + "\n";
                 root.checkStep(data);
             }
         }
         onExited: (exitCode, exitStatus) => {
+            if (root.pendingLog.length > 0) {
+                logText.text += root.pendingLog;
+                root.pendingLog = "";
+            }
             if (exitCode === 0) {
                 root.currentStep = root.stepLabels.length;
                 root.statusText = "Install complete. You can reboot now.";

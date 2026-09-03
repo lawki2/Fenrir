@@ -34,7 +34,9 @@ def _cmd_install(plan_json):
 
     try:
         backend.run_install(plan, progress)
-    except backend.InstallError as exc:
+    except Exception as exc:
+        # Catch everything, not just InstallError, so INSTALL_OK/INSTALL_ERROR
+        # always prints — otherwise QML waits forever on a silently-dead process.
         print(f"INSTALL_ERROR: {exc}", flush=True)
         sys.exit(1)
     print("INSTALL_OK", flush=True)

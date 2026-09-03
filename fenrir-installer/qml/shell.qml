@@ -110,6 +110,20 @@ FloatingWindow {
                 scale = 1;
             }
 
+            // The Loader recreates each page on every navigation, so
+            // restore Locale/Keyboard selections here or Back silently resets them.
+            onLoaded: {
+                if (root.currentPage === "locale") {
+                    if (root.plan.timezone)
+                        pageLoader.item.selectedTimezone = root.plan.timezone;
+                    if (root.plan.locale)
+                        pageLoader.item.selectedLocale = root.plan.locale;
+                } else if (root.currentPage === "keyboard") {
+                    if (root.plan.keyboard)
+                        pageLoader.item.selectedLayout = root.plan.keyboard;
+                }
+            }
+
             Behavior on opacity {
                 enabled: !pageLoader.resetting
                 Anim {}

@@ -8,12 +8,18 @@ Item {
     id: root
 
     readonly property string confirmText: "ERASE"
-    readonly property bool confirmed: root.selectedDiskLabel !== "" && confirmField.text === confirmText
-    readonly property var diskLabels: root.disks.map(root.diskLabel)
-    readonly property string selectedDisk: {
+    // Not a hard minimum — just a sane floor above the ESP size, flagged
+    // here instead of failing deep in backend.py later.
+    readonly property real minRecommendedGib: 16
+    readonly property var selectedDisk_: {
         const i = root.diskLabels.indexOf(root.selectedDiskLabel);
-        return i >= 0 ? root.disks[i].path : "";
+        return i >= 0 ? root.disks[i] : null;
     }
+    readonly property bool diskTooSmall: root.selectedDisk_ !== null
+        && (root.selectedDisk_.size / (1024 ** 3)) < root.minRecommendedGib
+    readonly property bool confirmed: root.selectedDiskLabel !== "" && !root.diskTooSmall && confirmField.text === confirmText
+    readonly property var diskLabels: root.disks.map(root.diskLabel)
+    readonly property string selectedDisk: root.selectedDisk_ !== null ? root.selectedDisk_.path : ""
 
     property var disks: []
     property string selectedDiskLabel: ""
@@ -57,6 +63,16 @@ Item {
             onPicked: value => root.selectedDiskLabel = value
         }
 
+        Text {
+            visible: root.diskTooSmall
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: `This disk is too small for a comfortable install (under ${root.minRecommendedGib.toFixed(0)} GiB) — pick a different one.`
+            color: Colours.m3error
+            font.family: Fonts.sans
+            font.pointSize: TokenConfig.appearance.fontSize.small
+        }
+
         StyledTextField {
             id: confirmField
             Layout.fillWidth: true
@@ -66,7 +82,7 @@ Item {
 
         Text {
             visible: root.errorVisible
-            text: "Select a disk and type ERASE to confirm."
+            text: "Select a large enough disk and type ERASE to confirm."
             color: Colours.m3error
             font.family: Fonts.sans
             font.pointSize: TokenConfig.appearance.fontSize.small

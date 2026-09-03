@@ -1,10 +1,5 @@
-"""Does the actual install: partitioning, pacstrap, and target configuration.
-
-Runs as root (the whole app is launched through pkexec), so no further
-privilege escalation happens here, just plain subprocess calls. Every step
-streams its output through the given progress callback so the UI's progress
-page (and the serial console, since stdout is already piped to it by the
-launcher) can show what's happening.
+"""Does the actual install: partitioning, pacstrap, target configuration.
+Runs as root already (launched via pkexec) — no escalation happens here.
 """
 
 import subprocess
@@ -46,8 +41,15 @@ class InstallPlan:
 
 def _stream(cmd, progress, **kwargs):
     progress(f"+ {' '.join(cmd)}")
+    # stdbuf forces line buffering (piped output is block-buffered
+    # otherwise, so pacstrap's progress arrives in one late burst);
+    # nice/ionice keep this from starving the compositor thread.
     proc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, **kwargs
+        ["nice", "-n", "10", "ionice", "-c2", "-n7", "stdbuf", "-oL", "-eL", *cmd],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        **kwargs,
     )
     for line in proc.stdout:
         progress(line.rstrip())
@@ -57,7 +59,31 @@ def _stream(cmd, progress, **kwargs):
 
 
 def _chroot(cmd, progress):
-    _stream(["arch-chroot", str(TARGET), *cmd], progress)
+    # Strip LD_PRELOAD (set by _stream's stdbuf wrapper) before it leaks
+    # into the chroot via arch-chroot's inherited environment.
+    _stream(["arch-chroot", str(TARGET), "env", "-u", "LD_PRELOAD", *cmd], progress)
+
+
+def _boot_medium_disk():
+    # Resolves the live boot medium to its parent disk so list_disks()
+    # can exclude it — wiping the running installer's own USB is unrecoverable.
+    try:
+        source = subprocess.run(
+            ["findmnt", "-no", "SOURCE", "/run/archiso/bootmnt"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        parent = subprocess.run(
+            ["lsblk", "-no", "PKNAME", source],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        # Whole-disk media (e.g. optical, no partition table) have no parent.
+        return parent or source.removeprefix("/dev/")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
 
 
 def list_disks():
@@ -70,6 +96,7 @@ def list_disks():
     import json
 
     data = json.loads(out)
+    boot_disk = _boot_medium_disk()
     return [
         {
             "path": d["path"],
@@ -77,9 +104,8 @@ def list_disks():
             "model": (d.get("model") or "").strip(),
         }
         for d in data["blockdevices"]
-        # lsblk reports zram and loop devices as TYPE="disk" too; neither
-        # is a real install target.
-        if d["type"] == "disk" and not d["name"].startswith(("zram", "loop"))
+        # Exclude zram/loop pseudo-disks and the live boot medium itself.
+        if d["type"] == "disk" and not d["name"].startswith(("zram", "loop")) and d["name"] != boot_disk
     ]
 
 
@@ -91,9 +117,7 @@ def _partition_paths(disk):
 def partition_and_mount(disk, esp_mib, progress):
     boot_part, root_part = _partition_paths(disk)
 
-    # A previous failed attempt can leave the target mounted, which makes
-    # wipefs/sgdisk fail with "device busy" on retry. Clear that first;
-    # it's expected to fail harmlessly when there's nothing mounted.
+    # Clear any mount left by a failed previous attempt; harmless if none exists.
     progress("Clearing any leftover mounts from a previous attempt")
     subprocess.run(
         ["umount", "-R", str(TARGET)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -108,6 +132,9 @@ def partition_and_mount(disk, esp_mib, progress):
     )
     _stream(["sgdisk", "-n", "2:0:0", "-t", "2:8300", "-c", "2:FENRIR_ROOT", disk], progress)
     _stream(["partprobe", disk], progress)
+    # partprobe can return before udev finishes creating the new device
+    # nodes; wait for udev before mkfs races it.
+    _stream(["udevadm", "settle"], progress)
 
     progress("Formatting partitions")
     _stream(["mkfs.fat", "-F32", "-n", "FENRIR_BOOT", boot_part], progress)
@@ -154,12 +181,8 @@ def pacstrap_target(progress):
 
 
 def copy_skel(progress):
-    # /etc/skel's Caelestia symlinks are an airootfs customization baked
-    # only into the live squashfs, not something any package installs.
-    # pacstrap alone leaves the target with the bare, near-empty /etc/skel
-    # the base packages ship, so useradd -m later would create a user with
-    # no Hyprland/Caelestia config at all. Copy the live session's own
-    # already-configured /etc/skel onto the target to fix that.
+    # pacstrap leaves a bare /etc/skel; copy the live session's own
+    # Caelestia-configured skel onto the target instead.
     progress("Copying Caelestia configuration into /etc/skel")
     target_skel = TARGET / "etc/skel"
     target_skel.mkdir(parents=True, exist_ok=True)
@@ -214,12 +237,25 @@ def configure_hostname(hostname, progress):
     )
 
 
+# Matches the live session's liveuser groups (useradd -G wheel alone
+# misses these); added one at a time so a missing group doesn't fail the install.
+USER_GROUPS = ("network", "power", "adm", "uucp", "optical", "rfkill", "video", "storage", "audio", "users")
+
+
 def create_user(username, full_name, password, progress):
     progress(f"Creating user {username}")
     _chroot(
         ["useradd", "-m", "-G", "wheel", "-s", "/usr/bin/fish", "-c", full_name, username],
         progress,
     )
+    for group in USER_GROUPS:
+        proc = subprocess.run(
+            ["arch-chroot", str(TARGET), "usermod", "-aG", group, username],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            progress(f"Note: couldn't add {username} to group '{group}' (it may not exist on this install) - continuing")
     for account in (username, "root"):
         proc = subprocess.run(
             ["arch-chroot", str(TARGET), "chpasswd"],
@@ -230,14 +266,18 @@ def create_user(username, full_name, password, progress):
             raise InstallError(f"Failed to set password for {account}")
 
 
+def configure_sudo(progress):
+    # wheel is commented out in Arch's default sudoers; drop in a file
+    # instead of editing it directly. sudo requires exactly 0440 to read it.
+    progress("Enabling sudo for the wheel group")
+    sudoers_wheel = TARGET / "etc/sudoers.d/wheel"
+    sudoers_wheel.write_text("%wheel ALL=(ALL:ALL) ALL\n")
+    sudoers_wheel.chmod(0o440)
+
+
 def configure_kernel_cmdline(root_part, progress):
-    # limine-entry-tool falls back to reading /proc/cmdline for kernel
-    # parameters when none are configured. Since arch-chroot always
-    # bind-mounts /proc from the host, that's the *live ISO's* own boot
-    # parameters in our case, not anything valid for the installed system,
-    # and limine-entry-tool's own docs warn against exactly this case. It
-    # also checks /etc/kernel/cmdline first, so writing the real value
-    # there directly avoids that ever coming up.
+    # Without this, limine-entry-tool falls back to /proc/cmdline, which
+    # under arch-chroot is the live ISO's own boot params, not the target's.
     progress("Writing kernel command line")
     uuid = subprocess.run(
         ["blkid", "-s", "UUID", "-o", "value", root_part],
@@ -254,16 +294,19 @@ def finalize_bootloader(progress):
     # Registers the initial NVRAM boot entry for this fresh install.
     progress("Installing Limine")
     _chroot(["limine-install"], progress)
-    # limine-update is the exact sequence limine-mkinitcpio-hook's own
-    # tooling uses to regenerate everything: limine-install
-    # --no-efi-register (skip re-touching NVRAM, already done above) then
-    # limine-mkinitcpio, which is what actually writes each installed
-    # kernel's real boot entry into limine.conf (and keeps the EFI
-    # fallback path in sync via its own defaults) and has to run last, or
-    # a later limine-install call can clobber limine.conf back down to
-    # just its own generic placeholder entry.
+    # limine-update writes each kernel's real boot entry into limine.conf;
+    # must run after limine-install or it gets clobbered back to a placeholder.
     progress("Generating initramfs and Limine boot entries")
     _chroot(["limine-update"], progress)
+
+    # limine-install/update don't touch this setting; force it last so
+    # it isn't clobbered by either call.
+    progress("Configuring Limine to boot straight to the desktop")
+    limine_conf = TARGET / "boot/limine.conf"
+    lines = limine_conf.read_text().splitlines()
+    lines = [line for line in lines if not line.strip().startswith("timeout:")]
+    lines.insert(0, "timeout: 0")
+    limine_conf.write_text("\n".join(lines) + "\n")
 
 
 ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "sddm", "ufw")
@@ -276,13 +319,8 @@ def enable_services(progress):
 
 
 def configure_firewall(progress):
-    # ufw ships with ENABLED=no until someone runs `ufw enable` - flip that
-    # directly rather than running `ufw enable` inside the chroot, since
-    # that also tries to apply the ruleset through netfilter immediately,
-    # which is chroot state best left to the installed system's own first
-    # real boot (where ufw.service, enabled above, applies it). Package
-    # defaults otherwise (deny incoming, allow outgoing, deny forward, in
-    # /etc/default/ufw) are left untouched - that's the standard policy.
+    # Flip ENABLED directly rather than `ufw enable`, which would also
+    # try to apply the ruleset through netfilter mid-chroot.
     progress("Enabling firewall")
     (TARGET / "etc/ufw/ufw.conf").write_text(
         "# /etc/ufw/ufw.conf\n"
@@ -300,11 +338,8 @@ def configure_firewall(progress):
 
 def unmount_target(progress):
     progress("Unmounting target")
-    # A process started during one of the arch-chroot calls above (notably
-    # gpg-agent, from pacstrap's keyring setup) can outlive that invocation
-    # and keep the target busy even though the install itself is done. Kill
-    # anything still using it, then fall back to a lazy unmount if
-    # something is still holding on regardless.
+    # gpg-agent (from pacstrap's keyring setup) can outlive its chroot and
+    # keep the target busy; kill stragglers, then fall back to a lazy unmount.
     subprocess.run(
         ["fuser", "-km", str(TARGET)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
@@ -325,6 +360,7 @@ def run_install(plan: InstallPlan, progress):
     configure_keyboard(plan.keyboard, progress)
     configure_hostname(plan.hostname, progress)
     create_user(plan.username, plan.full_name, plan.password, progress)
+    configure_sudo(progress)
     _, root_part = _partition_paths(plan.disk)
     configure_kernel_cmdline(root_part, progress)
     finalize_bootloader(progress)
