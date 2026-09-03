@@ -85,6 +85,45 @@ ConnectedRect {
             || key === Qt.Key_AltGr;
     }
 
+    // Four real manifest entries (kbGoToWs="SUPER", kbMoveWinToWs="SUPER +
+    // ALT", kbGoToWsGroup="CTRL + SUPER", kbMoveWinToWsGroup="CTRL + SUPER
+    // + ALT") are pure modifier chords with no regular key at all -
+    // Keys.onPressed alone can never complete one of these, since it
+    // returns early on every modifier keypress waiting for a "real" key
+    // that's never coming. Building the ordered name list from a tracked
+    // set of held modifier keys (not event.modifiers, whose value on a
+    // release event isn't reliably the pre-release state) lets
+    // Keys.onReleased below complete the capture once every held modifier
+    // has been let go with nothing else pressed in between.
+    function orderedModifierNames(keys: var): var {
+        const present = {
+            ctrl: false,
+            super: false,
+            shift: false,
+            alt: false
+        };
+        for (const k of keys) {
+            if (k === Qt.Key_Control)
+                present.ctrl = true;
+            else if (k === Qt.Key_Meta || k === Qt.Key_Super_L || k === Qt.Key_Super_R)
+                present.super = true;
+            else if (k === Qt.Key_Shift)
+                present.shift = true;
+            else if (k === Qt.Key_Alt || k === Qt.Key_AltGr)
+                present.alt = true;
+        }
+        const parts = [];
+        if (present.ctrl)
+            parts.push("CTRL");
+        if (present.super)
+            parts.push("SUPER");
+        if (present.shift)
+            parts.push("SHIFT");
+        if (present.alt)
+            parts.push("ALT");
+        return parts;
+    }
+
     Layout.fillWidth: true
     implicitHeight: rowLayout.implicitHeight + Tokens.padding.medium * 2
 
@@ -123,6 +162,7 @@ ConnectedRect {
             id: captureBox
 
             property bool capturing: false
+            property var heldModifiers: []
 
             Layout.preferredWidth: 190
             Layout.preferredHeight: captureText.implicitHeight + Tokens.padding.small * 2
@@ -143,11 +183,16 @@ ConnectedRect {
                     return;
 
                 event.accepted = true;
-                if (root.isModifierKey(event.key))
+
+                if (root.isModifierKey(event.key)) {
+                    if (captureBox.heldModifiers.indexOf(event.key) === -1)
+                        captureBox.heldModifiers = captureBox.heldModifiers.concat([event.key]);
                     return;
+                }
 
                 if (event.key === Qt.Key_Escape && event.modifiers === Qt.NoModifier) {
                     captureBox.capturing = false;
+                    captureBox.heldModifiers = [];
                     return;
                 }
 
@@ -167,8 +212,34 @@ ConnectedRect {
                 parts.push(name);
 
                 captureBox.capturing = false;
+                captureBox.heldModifiers = [];
                 const combo = parts.join(" + ");
                 if (combo !== root.value)
+                    root.changed(combo);
+            }
+
+            Keys.onReleased: event => {
+                if (!captureBox.capturing)
+                    return;
+                if (!root.isModifierKey(event.key))
+                    return;
+                if (captureBox.heldModifiers.indexOf(event.key) === -1)
+                    return;
+
+                event.accepted = true;
+
+                const heldBeforeRelease = captureBox.heldModifiers;
+                const remaining = heldBeforeRelease.filter(k => k !== event.key);
+
+                if (remaining.length > 0) {
+                    captureBox.heldModifiers = remaining;
+                    return;
+                }
+
+                captureBox.capturing = false;
+                captureBox.heldModifiers = [];
+                const combo = root.orderedModifierNames(heldBeforeRelease).join(" + ");
+                if (combo.length > 0 && combo !== root.value)
                     root.changed(combo);
             }
 
