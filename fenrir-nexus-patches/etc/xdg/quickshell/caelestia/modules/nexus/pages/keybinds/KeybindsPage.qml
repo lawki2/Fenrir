@@ -315,6 +315,15 @@ PageBase {
 
             path: `${Quickshell.env("HOME")}/.config/caelestia/hypr-vars.lua`
             printErrors: false
+            // Component.onCompleted below also calls loadOverrides()
+            // eagerly, but if this FileView's initial read is actually
+            // asynchronous (as onLoadFailed existing at all implies it
+            // can be), that call would run against empty/stale text with
+            // nothing to re-trigger it once the real content lands -
+            // matching services/Colours.qml's own onLoaded-driven load()
+            // call fixes that; re-running loadOverrides() here is a
+            // harmless no-op if the eager call already had the real text.
+            onLoaded: root.loadOverrides()
             onLoadFailed: error => {
                 if (error === FileViewError.FileNotFound)
                     Qt.callLater(() => setText("return {}\n"));

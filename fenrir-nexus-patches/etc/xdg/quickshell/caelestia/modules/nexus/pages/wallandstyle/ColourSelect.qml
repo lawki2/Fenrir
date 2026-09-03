@@ -113,9 +113,20 @@ PageBase {
             running: true
             command: ["caelestia", "scheme", "list"]
             stdout: StdioCollector {
-                onStreamFinished: {
-                    root.schemeData = JSON.parse(text);
+                id: listCollector
+            }
+            onExited: exitCode => {
+                // schemeData already defaults to {} - on any failure just
+                // leave it there rather than letting a malformed/empty
+                // response (a CLI error, an upstream format change) throw
+                // out of JSON.parse and take the whole page down with it.
+                if (exitCode !== 0)
+                    return;
+                try {
+                    root.schemeData = JSON.parse(listCollector.text);
                     root.refreshFlavourItems();
+                } catch (e) {
+                    // leave schemeData as {} - not a crash, just no schemes shown
                 }
             }
         }

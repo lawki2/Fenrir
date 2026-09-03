@@ -247,6 +247,14 @@ PageBase {
 
             path: `${Quickshell.env("HOME")}/.config/caelestia/hypr-user.lua`
             printErrors: false
+            // Component.onCompleted's checkHyprUserState() call runs
+            // eagerly, but if this FileView's initial read is actually
+            // asynchronous, that call would see empty/stale text with
+            // nothing to re-trigger it once the real content lands -
+            // matching services/Colours.qml's own onLoaded-driven pattern
+            // fixes that; re-running the check here is a harmless no-op
+            // if the eager call already had the real text.
+            onLoaded: root.checkHyprUserState()
             onLoadFailed: error => {
                 if (error === FileViewError.FileNotFound)
                     Qt.callLater(() => setText(""));
