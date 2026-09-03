@@ -18,18 +18,8 @@ independent_aur_pkgs=(qtengine app2unit python-materialyoucolor libcava ttf-rubi
 # Depends on packages built in the previous stage.
 caelestia_aur_pkgs=(caelestia-cli caelestia-shell)
 
-# Pin the Caelestia stack to known-good AUR commits instead of always
-# building whatever's currently latest - the "sync deliberately" half of
-# the Caelestia update policy (see fenrir_roadmap.md) was previously just
-# a stated intent with nothing in this script actually enforcing it, which
-# let an unpinned `git clone --depth 1` silently pull caelestia-shell
-# 2.3.0 over this dev machine's 2.2.0 and break fenrir-nexus-patches'
-# Toggles.qml (Config.utilities.quickToggles's type changed between those
-# versions). These two hashes are exactly what was built, fixed, and
-# confirmed to diff cleanly against fenrir-nexus-patches/ on 2026-08-24 -
-# bump them deliberately (and re-diff every overlay file that copies a
-# real upstream file against the new tarball) when there's a real reason
-# to take a newer version, never by just deleting this pin.
+# Pin to known-good commits — an unpinned clone once silently broke
+# fenrir-nexus-patches/Toggles.qml on a version bump. Bump deliberately.
 declare -A pinned_aur_commits=(
     [caelestia-cli]="58f0b55e2231476b01ddfb829d20b6fb474b1f1a"   # 1.1.2
     [caelestia-shell]="0b4bd59c6043fa838c62d00f6fa9457f788c263f" # 2.3.0
@@ -39,10 +29,8 @@ repo_db="${repo_dir}/${repo_name}.db.tar.gz"
 
 ensure_repo_db() {
     if [[ ! -e "$repo_db" ]]; then
-        # repo-add refuses to create a db with zero packages (exits 0 without
-        # writing anything!), so bootstrap an empty-but-valid tar.gz by hand.
-        # pacman resolves the repo via the stable "<repo>.db" symlink that
-        # repo-add would normally create alongside it, so do that too.
+        # repo-add refuses to create a db with zero packages; bootstrap an
+        # empty tar.gz plus the ".db" symlink pacman expects by hand.
         tar -czf "$repo_db" -T /dev/null
         ln -sf "$(basename "$repo_db")" "${repo_dir}/${repo_name}.db"
     fi
@@ -52,10 +40,8 @@ ensure_chroot() {
     if [[ ! -d "$chroot_dir/root" ]]; then
         echo "==> Creating clean build chroot at $chroot_dir"
         mkdir -p "$chroot_dir"
-        # git is needed at build time too, not just for cloning PKGBUILDs on
-        # the host. caelestia-shell's own build() step git clones a module
-        # (M3Shapes) through CMake FetchContent, and base-devel alone does
-        # not include git.
+        # caelestia-shell's build() step git-clones a module via CMake
+        # FetchContent; base-devel alone doesn't include git.
         sudo mkarchroot "$chroot_dir/root" base-devel git
     fi
 
@@ -78,10 +64,32 @@ EOF
 build_one() {
     local pkg="$1" src="$2" # src: "aur" or an absolute path to a local PKGBUILD dir
     local build_root="$work_dir/$pkg"
+    local existing
+    existing="$(compgen -G "$repo_dir/${pkg}-*.pkg.tar.zst" | head -1)" || true
 
-    if compgen -G "$repo_dir/${pkg}-*.pkg.tar.zst" >/dev/null; then
-        echo "==> $pkg already built, skipping (delete $repo_dir/${pkg}-*.pkg.tar.zst to rebuild)"
-        return
+    if [[ -n "$existing" ]]; then
+        if [[ "$pkg" == "caelestia-shell" ]]; then
+            # caelestia-shell splices in fenrir-nexus-patches/ and the
+            # wallpaper at build time, so check those for staleness too.
+            if [[ -z "$(find "$src_dir/fenrir-nexus-patches" "$src_dir/assets/wallpaper.webp" -type f -newer "$existing" 2>/dev/null)" ]]; then
+                echo "==> $pkg already built and up to date, skipping"
+                return
+            fi
+            echo "==> $pkg's Nexus overlay or wallpaper changed since last build, rebuilding"
+            rm -f "$repo_dir/${pkg}"-*.pkg.tar.zst
+        elif [[ "$src" == "aur" ]]; then
+            echo "==> $pkg already built, skipping (delete $repo_dir/${pkg}-*.pkg.tar.zst to rebuild)"
+            return
+        else
+            # Local packages have a real source tree to diff against;
+            # a stale binary shipped silently three times before this check.
+            if [[ -z "$(find "$src" -type f -newer "$existing" 2>/dev/null)" ]]; then
+                echo "==> $pkg already built and up to date, skipping"
+                return
+            fi
+            echo "==> $pkg source changed since last build, rebuilding"
+            rm -f "$repo_dir/${pkg}"-*.pkg.tar.zst
+        fi
     fi
 
     rm -rf "$build_root"
@@ -101,31 +109,28 @@ build_one() {
     fi
 
     if [[ "$pkg" == "caelestia-shell" ]]; then
-        # caelestia-shell's own PKGBUILD depends on quickshell-git specifically.
-        # CachyOS's quickshell-git repo build is a stale snapshot that predates
-        # quickshell's "DefaultEnv" pragma support, which the current shell.qml
-        # requires to even launch. CachyOS's plain "quickshell" package is a
-        # newer, actively rebuilt release with that support, so build against
-        # that instead.
+        # CachyOS's quickshell-git is a stale snapshot predating "DefaultEnv"
+        # pragma support that shell.qml requires; build against quickshell instead.
         sed -i "s/'quickshell-git'/'quickshell'/" "$build_root/PKGBUILD"
 
-        # Ship Fenrir's own default wallpaper instead of upstream Caelestia's.
-        # Wallpapers.qml's fallback (used whenever no per-user wallpaper state
-        # exists yet, i.e. every fresh live/installed user) is hardcoded to
-        # this exact packaged path with no config override point, so the only
-        # way to change it is to replace the file the package itself installs
-        # — a plain airootfs overlay can't work here since mkarchiso copies
-        # airootfs *before* pacstrap, so pacstrap would just clobber it back.
+        # sed's `a` is a silent no-op if this anchor line ever changes,
+        # which would ship a broken ISO with zero build-log error.
+        if ! grep -qF 'DESTDIR="$pkgdir" cmake --install build' "$build_root/PKGBUILD"; then
+            echo "==> caelestia-shell's PKGBUILD no longer has the expected" \
+                "'DESTDIR=\"\$pkgdir\" cmake --install build' line - the wallpaper" \
+                "and Nexus overlay injection below needs updating for the new" \
+                "PKGBUILD shape before this pin can be trusted." >&2
+            exit 1
+        fi
+
+        # Wallpapers.qml's fallback is hardcoded to this packaged path; an
+        # airootfs overlay can't win here since pacstrap runs after and clobbers it.
         cp "$src_dir/assets/wallpaper.webp" "$build_root/fenrir-wallpaper.webp"
         sed -i '/DESTDIR="\$pkgdir" cmake --install build/a\    install -Dm644 "$startdir/fenrir-wallpaper.webp" "$pkgdir/etc/xdg/quickshell/caelestia/assets/wallpaper.webp"' \
             "$build_root/PKGBUILD"
 
-        # Overlay Fenrir's own Nexus settings-page additions (new/modified
-        # QML under fenrir-nexus-patches/, tracked in this repo, authored
-        # and verified against real upstream files - never generated from
-        # scratch) on top of the freshly cmake-installed tree, same
-        # "insert right after DESTDIR=... cmake --install build" anchor as
-        # the wallpaper install above.
+        # Overlay fenrir-nexus-patches/ onto the cmake-installed tree,
+        # same anchor point as the wallpaper install above.
         cp -r "$src_dir/fenrir-nexus-patches/etc" "$build_root/fenrir-nexus-etc"
         sed -i '/DESTDIR="\$pkgdir" cmake --install build/a\    cp -rv "$startdir/fenrir-nexus-etc/." "$pkgdir/etc/"' \
             "$build_root/PKGBUILD"
@@ -153,16 +158,14 @@ for pkg in "${caelestia_aur_pkgs[@]}"; do
     build_one "$pkg" aur
 done
 
-# caelestia-meta itself isn't published on AUR. It's built from the
-# PKGBUILD at ~/caelestia, cloned fresh here if it's not already present
-# (e.g. in CI), or kept in sync via git pull there otherwise.
+# Not on AUR; built from ~/caelestia, cloned once and never auto-pulled —
+# same pin-deliberately policy as pinned_aur_commits above.
 if [[ ! -d "$HOME/caelestia" ]]; then
     git clone https://github.com/caelestia-dots/caelestia.git "$HOME/caelestia"
 fi
 build_one "caelestia-meta" "$HOME/caelestia"
 
-# fenrir-installer is Fenrir's own package, not on AUR either. Its PKGBUILD
-# lives in this repo.
+# Fenrir's own package, not on AUR; its PKGBUILD lives in this repo.
 build_one "fenrir-installer" "$src_dir/fenrir-installer"
 
 echo "==> Done. Built packages are in $repo_dir"
