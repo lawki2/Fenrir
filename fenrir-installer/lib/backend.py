@@ -180,6 +180,58 @@ def pacstrap_target(progress):
     _stream(["pacstrap", "-K", str(TARGET), *packages], progress)
 
 
+# Filled in once the dedicated Fenrir package-signing key exists (see
+# archiso/airootfs/etc/pacman.d/fenrir-signing-key.asc and secrets/ in the
+# repo root) - re-derive via:
+#   GNUPGHOME=secrets/gnupg gpg --show-keys --with-colons \
+#       archiso/airootfs/etc/pacman.d/fenrir-signing-key.asc | awk -F: '/^fpr/{print $10; exit}'
+FENRIR_REPO_KEY_FPR = "BE0B53BD597DF2CDB8437E869C17423CED27E4BE"
+
+
+def configure_fenrir_repo(progress):
+    # No key generated yet - a build made before then should ship with no
+    # [fenrir] repo configured, not a hard install failure the moment
+    # pacman-key is asked to trust a fingerprint that doesn't exist yet.
+    if FENRIR_REPO_KEY_FPR is None:
+        progress("Skipping Fenrir package repo — no signing key configured yet")
+        return
+
+    progress("Configuring the Fenrir package repository")
+
+    live_mirrorlist = Path("/etc/pacman.d/fenrir-mirrorlist")
+    live_key = Path("/etc/pacman.d/fenrir-signing-key.asc")
+    for f in (live_mirrorlist, live_key):
+        if not f.exists():
+            raise InstallError(f"{f} is missing from the live image")
+
+    pacman_d = TARGET / "etc/pacman.d"
+    pacman_d.mkdir(parents=True, exist_ok=True)
+    (pacman_d / "fenrir-mirrorlist").write_text(live_mirrorlist.read_text())
+    (pacman_d / "fenrir-signing-key.asc").write_text(live_key.read_text())
+
+    # Anchored on [core], not [cachyos] - [core] is guaranteed present in
+    # pacman's own default template pacstrap just laid down, whereas
+    # [cachyos] only exists here because CachyOS's own keyring/hooks
+    # package injected it during this same pacstrap transaction.
+    pacman_conf = TARGET / "etc/pacman.conf"
+    lines = pacman_conf.read_text().splitlines()
+    if not any(line.strip() == "[fenrir]" for line in lines):
+        anchor = next(i for i, line in enumerate(lines) if line.strip() == "[core]")
+        lines[anchor:anchor] = [
+            "[fenrir]",
+            "SigLevel = Required",
+            "Include = /etc/pacman.d/fenrir-mirrorlist",
+            "",
+        ]
+        pacman_conf.write_text("\n".join(lines) + "\n")
+
+    # pacstrap -K above already initialized a fresh keyring at
+    # etc/pacman.d/gnupg for this target, so pacman-key has something to
+    # add to.
+    _chroot(["pacman-key", "--add", "/etc/pacman.d/fenrir-signing-key.asc"], progress)
+    _chroot(["pacman-key", "--lsign-key", FENRIR_REPO_KEY_FPR], progress)
+
+
 def copy_skel(progress):
     # pacstrap leaves a bare /etc/skel; copy the live session's own
     # Caelestia-configured skel onto the target instead.
@@ -354,6 +406,7 @@ def run_install(plan: InstallPlan, progress):
     partition_and_mount(plan.disk, plan.esp_mib, progress)
     progress("Installing packages (this takes a while)")
     pacstrap_target(progress)
+    configure_fenrir_repo(progress)
     copy_skel(progress)
     genfstab_target(progress)
     configure_locale(plan.timezone, plan.locale, progress)

@@ -1,0 +1,15 @@
+## Fenrir package repo ([fenrir] in pacman.conf) - caelestia-shell/-cli
+## post-install updates. Included into [fenrir]'s section by
+## fenrir-installer/lib/backend.py's configure_fenrir_repo(), same
+## Include-a-mirrorlist shape [cachyos] already uses with its own
+## cachyos-mirrorlist.
+##
+## pacman tries Server= lines in listed order and only falls to the next
+## one on failure, not by speed - so the dedicated VPS mirror (once it
+## exists) belongs first, already in its intended final position, with
+## GitHub Pages underneath as the always-on free fallback. Adding the VPS
+## later is just uncommenting the line below and filling in the real URL;
+## no reordering, and nothing elsewhere needs to change.
+
+#Server = https://<future-vps-mirror>/$arch
+Server = https://lawki2.github.io/Fenrir/$arch
