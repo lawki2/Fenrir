@@ -53,11 +53,7 @@ same as you would for any early-stage OS.
   shell, extended with Fenrir's own additions) covers colour schemes,
   display layout, keybinds, and the firewall — all editable from a GUI,
   no dotfiles required.
-- **Caelestia updates actually reach installed machines**, not just the
-  live ISO. Fenrir's patched `caelestia-shell`/`caelestia-cli` are
-  published to a real, GPG-signed pacman repo, so a plain `pacman -Syu`
-  keeps them current after install instead of freezing them forever at
-  whatever shipped on the ISO.
+
 
 ## What's planned
 
