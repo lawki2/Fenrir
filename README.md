@@ -19,9 +19,9 @@ replacing Calamares.
 
 <div align="center">
 
-[![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://mega.nz/file/q34VGBjS#okXNEUtizyZKU98HJEBA72q0AGTueBOKOmlxgWf_MY8)
+[![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
 
-`fenrir-linux-260819.iso`, sha256 `8977886c5de19e4c956be827dbefe880a8dbf21695c5736521992ecd96a0110c`
+`fenrir-linux-260903.iso`, sha256 `b508bbf3383cf0d389e472eb905753d59ddfab30859c41fd610477b9824daeb6`
 
 **Early alpha.** This is an early build. Expect rough edges, missing polish,
 and the occasional bug. Back up anything you care about before installing,
@@ -49,6 +49,15 @@ same as you would for any early-stage OS.
   few of their own deps) are built ahead of time into a local pacman repo via
   `build-local-repo.sh`, so neither the ISO build nor an actual install ever
   needs AUR access.
+- **A real settings app, not a config file.** Nexus (part of the Caelestia
+  shell, extended with Fenrir's own additions) covers colour schemes,
+  display layout, keybinds, and the firewall — all editable from a GUI,
+  no dotfiles required.
+- **Caelestia updates actually reach installed machines**, not just the
+  live ISO. Fenrir's patched `caelestia-shell`/`caelestia-cli` are
+  published to a real, GPG-signed pacman repo, so a plain `pacman -Syu`
+  keeps them current after install instead of freezing them forever at
+  whatever shipped on the ISO.
 
 ## What's planned
 
@@ -57,18 +66,21 @@ Fenrir's still early. Roughly where it's headed from here:
 - **Snapshots and rollback**, wired right into the boot menu: the safety net
   that makes trusting a rolling-release distro for daily use feel
   reasonable.
-- **A real settings app**: keybinds, window rules, look & feel, and display
-  layout, all editable without ever opening a config file.
+- **The rest of the settings app**: window rules and deeper look & feel
+  controls (gaps, borders, animations) are what's left — colours, display
+  layout, keybinds, and the firewall are already covered.
 - **A fully offline installer**: no network required, since the live
   session you're already running has everything it needs.
 - **A proper first-boot tutorial** for anyone new to tiling window
   managers. A lightweight version already ships in the installer; a
   fuller one is coming.
-- **Less "under the hood" visible during setup**: a real progress indicator
-  instead of a wall of install logs, a quieter boot, and a login screen
-  that actually matches the desktop.
+- **Less "under the hood" visible during setup**: a quieter boot and a
+  login screen that actually matches the desktop. A real step-by-step
+  install progress indicator, replacing a wall of raw logs, already
+  shipped.
 
-Further out: Fenrir hosting its own package repo.
+Further out: expanding Fenrir's own package repo beyond just Caelestia —
+part of what separates an independent distro from a CachyOS remix.
 
 ## Building
 
@@ -107,7 +119,8 @@ The finished ISO ends up in `out/fenrir/`.
 
 Bug reports, feedback, and pull requests are all welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md) for how the project's laid out and how
-to get a change reviewed. If you just want to try it and say what broke.
+to get a change reviewed. Just trying it and reporting what broke counts
+too, no formal bug report required.
 
 ## Attribution
 
