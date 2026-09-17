@@ -49,6 +49,13 @@ load_vars "$HOME/.makepkg.conf" || true
 load_vars /etc/makepkg.conf
 [[ -n "${GPGKEY:-}" ]] || die "GPGKEY is not set (see secrets/publish.env) - refusing to publish an unsigned [fenrir] repo."
 
+# Publishing only copies what build-local-repo.sh already produced, so a
+# newer overlay than the built package means shipping stale content silently.
+shell_pkg="$(find "$repo_dir" -maxdepth 1 -name "caelestia-shell-*.pkg.tar.zst" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
+if [[ -n "$shell_pkg" ]] && [[ -n "$(find "$src_dir/fenrir-nexus-patches" -type f -newer "$shell_pkg" 2>/dev/null)" ]]; then
+    die "fenrir-nexus-patches/ is newer than %s - run build-local-repo.sh first (and bump fenrir_rebuild if the version is unchanged)." "$(basename "$shell_pkg")"
+fi
+
 rm -rf "$publish_dir"
 mkdir -p "$publish_dir/$arch"
 
