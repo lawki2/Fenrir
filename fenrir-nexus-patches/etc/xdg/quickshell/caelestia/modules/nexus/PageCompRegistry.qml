@@ -181,6 +181,9 @@ QtObject {
                 Component {
                     KeybindsPage {}
                 }
+                Component {
+                    SwitchShortcutPicker {}
+                }
             }
         },
         Component {

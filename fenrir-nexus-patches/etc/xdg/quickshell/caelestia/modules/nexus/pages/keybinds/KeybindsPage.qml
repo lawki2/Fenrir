@@ -367,5 +367,18 @@ PageBase {
                 }
             }
         }
+
+        SectionHeader {
+            text: qsTr("Keyboard layout")
+        }
+
+        NavRow {
+            first: true
+            last: true
+            icon: "keyboard"
+            text: qsTr("Switch layout")
+            subtext: qsTr("Cycles through the layouts set in System settings")
+            onClicked: root.nState.openSubPage(1)
+        }
     }
 }
