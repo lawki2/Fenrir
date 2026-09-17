@@ -16,6 +16,7 @@ import qs.modules.nexus.pages.monitors
 import qs.modules.nexus.pages.network
 import qs.modules.nexus.pages.panels
 import qs.modules.nexus.pages.services
+import qs.modules.nexus.pages.system
 import qs.modules.nexus.pages.wallandstyle
 import qs.modules.nexus.pages.panels.taskbar
 
@@ -117,6 +118,20 @@ QtObject {
         },
         Component {
             PlaceholderComp {}
+        },
+        Component {
+            // System
+            StackPage {
+                Component {
+                    SystemPage {}
+                }
+                Component {
+                    LayoutPicker {}
+                }
+                Component {
+                    TimezonePicker {}
+                }
+            }
         },
 
         // Shell

@@ -60,6 +60,12 @@ QtObject {
             description: qsTr("Manage plugins"),
             category: "system"
         },
+        {
+            label: qsTr("System"),
+            icon: "tune",
+            description: qsTr("Keyboard layouts, date & time"),
+            category: "system"
+        },
 
         // Shell
         {

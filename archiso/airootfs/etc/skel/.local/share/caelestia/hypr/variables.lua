@@ -13,6 +13,8 @@ return {
     audioSettings              = "pavucontrol",
 
     -- Touchpad
+    kbLayout                   = "us",
+    kbOptions                  = "grp:ctrl_space_toggle",
     touchpadDisableTyping      = true,
     touchpadScrollFactor       = 0.3,
     gestureFingers             = 3,
