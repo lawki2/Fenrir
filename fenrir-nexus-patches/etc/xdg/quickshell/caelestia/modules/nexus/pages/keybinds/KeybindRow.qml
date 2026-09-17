@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
 import qs.components
+import qs.services
 import qs.modules.nexus.common
 
 // Live key-capture rebind row: click the box, press the new combo, done.
