@@ -102,7 +102,6 @@ nbd
 ndisc6
 net-tools
 networkmanager
-nfs-utils
 nilfs-utils
 nmap
 noto-fonts
