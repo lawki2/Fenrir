@@ -208,14 +208,17 @@ def configure_fenrir_repo(progress):
     (pacman_d / "fenrir-mirrorlist").write_text(live_mirrorlist.read_text())
     (pacman_d / "fenrir-signing-key.asc").write_text(live_key.read_text())
 
-    # Anchored on [core], not [cachyos] - [core] is guaranteed present in
-    # pacman's own default template pacstrap just laid down, whereas
-    # [cachyos] only exists here because CachyOS's own keyring/hooks
-    # package injected it during this same pacstrap transaction.
+    # Anchored on [core]: it's guaranteed present in pacman's own default
+    # template pacstrap just laid down, unlike the CachyOS sections.
     pacman_conf = TARGET / "etc/pacman.conf"
     lines = pacman_conf.read_text().splitlines()
     if not any(line.strip() == "[fenrir]" for line in lines):
-        anchor = next(i for i, line in enumerate(lines) if line.strip() == "[core]")
+        # A bare next() raises StopIteration, which surfaces through cli.py
+        # as "INSTALL_ERROR:" with no message at all - miserable to debug
+        # from a progress log.
+        anchor = next((i for i, line in enumerate(lines) if line.strip() == "[core]"), None)
+        if anchor is None:
+            raise InstallError(f"No [core] section in {pacman_conf} to anchor [fenrir] against")
         lines[anchor:anchor] = [
             "[fenrir]",
             "SigLevel = Required",
@@ -229,6 +232,41 @@ def configure_fenrir_repo(progress):
     # add to.
     _chroot(["pacman-key", "--add", "/etc/pacman.d/fenrir-signing-key.asc"], progress)
     _chroot(["pacman-key", "--lsign-key", FENRIR_REPO_KEY_FPR], progress)
+
+
+# pacstrap lays down pacman's stock pacman.conf, and no CachyOS package
+# adds its repos (they ship mirrorlist files only) - so without this an
+# installed system can never update its kernel, nvidia or any cachyos pkg.
+CACHYOS_REPOS = ("cachyos-v3", "cachyos-extra-v3", "cachyos-core-v3", "cachyos")
+
+
+def configure_cachyos_repos(progress):
+    progress("Configuring the CachyOS package repositories")
+
+    pacman_conf = TARGET / "etc/pacman.conf"
+    lines = pacman_conf.read_text().splitlines()
+    if any(line.strip() == "[cachyos-v3]" for line in lines):
+        return
+
+    anchor = next((i for i, line in enumerate(lines) if line.strip() == "[core]"), None)
+    if anchor is None:
+        raise InstallError(f"No [core] section in {pacman_conf} to anchor the CachyOS repos against")
+
+    block = []
+    for repo in CACHYOS_REPOS:
+        generic = repo == "cachyos"
+        mirrorlist = "cachyos-mirrorlist" if generic else "cachyos-v3-mirrorlist"
+        if not (TARGET / "etc/pacman.d" / mirrorlist).exists():
+            raise InstallError(f"/etc/pacman.d/{mirrorlist} is missing from the target")
+        # Not cdn77 (CachyOS's default first mirror): it 404s on every
+        # filename containing '+', and pacman then drops it mid-transaction
+        # and falls through to mirrors serving stale payloads.
+        arch = "$arch" if generic else "$arch_v3"
+        block += [f"[{repo}]", "SigLevel = Optional TrustAll",
+                  f"Server = https://mirror.cachyos.org/repo/{arch}/$repo",
+                  f"Include = /etc/pacman.d/{mirrorlist}", ""]
+    lines[anchor:anchor] = block
+    pacman_conf.write_text("\n".join(lines) + "\n")
 
 
 def copy_skel(progress):
@@ -406,6 +444,7 @@ def run_install(plan: InstallPlan, progress):
     progress("Installing packages (this takes a while)")
     pacstrap_target(progress)
     configure_fenrir_repo(progress)
+    configure_cachyos_repos(progress)
     copy_skel(progress)
     genfstab_target(progress)
     configure_locale(plan.timezone, plan.locale, progress)
