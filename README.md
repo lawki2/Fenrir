@@ -13,8 +13,7 @@ line behind it. Bug reports, feedback, and contributions are welcome; see
 [Contributing](#contributing) below.
 
 Under the hood it's still [CachyOS](https://cachyos.org/) (same kernel, same
-package repos) with a different desktop stack layered on top and its own
-installer, [`fenrir-installer`](fenrir-installer/), replacing Calamares.
+package repos) with a different desktop stack layered on top.
 
 Fenrir is built against CachyOS's `x86_64_v3` repositories, so it needs a CPU
 with AVX2 — Intel Haswell (2013) or AMD Excavator (2015) and newer. Older
@@ -24,8 +23,6 @@ machines won't boot the ISO.
 
 [![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
 
-`fenrir-linux-260903.iso`, sha256 `b508bbf3383cf0d389e472eb905753d59ddfab30859c41fd610477b9824daeb6`
-
 **Early alpha.** This is an early build. Expect rough edges, missing polish,
 and the occasional bug. Back up anything you care about before installing,
 same as you would for any early-stage OS.
@@ -34,28 +31,21 @@ same as you would for any early-stage OS.
 
 ## What's different
 
-- **Hyprland + Caelestia baked in.** The live image ships the full Caelestia
-  shell, dotfiles, and theme already wired up, so both the live session and
-  any account the installer creates land in a working, styled desktop
-  immediately, not a bare tiling WM you're expected to configure yourself.
-- **A themed installer built to match**, not a generic one bolted on.
-  `fenrir-installer` is a small QML/Quickshell app that reads Caelestia's
-  live colour scheme and themes itself from it in real time, right down to
-  the same fonts, motion, and rounded-corner language as the desktop it's
-  about to set up. It only asks what actually needs asking: locale,
-  keyboard, which disk to erase, and a hostname/user/password. No
-  bootloader or desktop-environment chooser, since there's only ever one
-  answer for either here.
-- **Limine**, silently, as the only bootloader.
-- **AUR packages prebuilt, not built at install time.** Caelestia's AUR-only
-  dependencies (`caelestia-cli`, `caelestia-shell`, `caelestia-meta`, and a
-  few of their own deps) are built ahead of time into a local pacman repo via
-  `build-local-repo.sh`, so neither the ISO build nor an actual install ever
-  needs AUR access.
-- **A real settings app, not a config file.** Nexus (part of the Caelestia
-  shell, extended with Fenrir's own additions) covers colour schemes,
-  display layout, keybinds, and the firewall — all editable from a GUI,
-  no dotfiles required.
+- **Hyprland and Caelestia, already set up.** The live image ships the whole
+  Caelestia shell, dotfiles, and theme wired up, so the live session and any
+  account the installer creates both land in a working, styled desktop rather
+  than a bare tiling WM you're expected to configure first.
+- **An installer that matches the desktop.**
+  [`fenrir-installer`](fenrir-installer/) is a small QML/Quickshell app that
+  reads Caelestia's live colour scheme and themes itself from it, down to the
+  same fonts and motion as the desktop it's about to install. It asks only
+  what needs asking — locale, keyboard, which disk to erase, and a
+  hostname/user/password — and everything it installs is prebuilt, so there's
+  no AUR access or compiling during setup.
+- **Settings you can click instead of edit.** We're in the process of moving
+  the settings that actually matter out of config files and into a real
+  settings page. A good chunk is there already; the rest is being worked
+  through.
 
 ## What's planned
 
@@ -65,17 +55,13 @@ Fenrir's still early. Roughly where it's headed from here:
   that makes trusting a rolling-release distro for daily use feel
   reasonable.
 - **The rest of the settings app**: window rules and deeper look & feel
-  controls (gaps, borders, animations) are what's left — colours, display
-  layout, keybinds, and the firewall are already covered.
+  controls are the main things still living in config files.
 - **A fully offline installer**: no network required, since the live
   session you're already running has everything it needs.
 - **A proper first-boot tutorial** for anyone new to tiling window
-  managers. A lightweight version already ships in the installer; a
-  fuller one is coming.
-- **Less "under the hood" visible during setup**: a quieter boot and a
-  login screen that actually matches the desktop. A real step-by-step
-  install progress indicator, replacing a wall of raw logs, already
-  shipped.
+  managers, beyond the lightweight one in the installer today.
+- **Less "under the hood" visible during setup**: a login screen that
+  actually matches the desktop is the last obvious seam.
 
 Further out: expanding Fenrir's own package repo beyond just Caelestia —
 part of what separates an independent distro from a CachyOS remix.
