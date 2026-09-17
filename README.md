@@ -8,16 +8,11 @@ together before it's usable. Tiling done the way it should feel: fast,
 coherent, and genuinely nice to look at, not just functional.
 
 It started as a personal project and is still early, so expect rough edges
-here and there — this isn't a polished commercial release with a support
-line behind it. Bug reports, feedback, and contributions are welcome; see
+here and there. Bug reports, feedback, and contributions are welcome; see
 [Contributing](#contributing) below.
 
 Under the hood it's still [CachyOS](https://cachyos.org/) (same kernel, same
 package repos) with a different desktop stack layered on top.
-
-Fenrir is built against CachyOS's `x86_64_v3` repositories, so it needs a CPU
-with AVX2 — Intel Haswell (2013) or AMD Excavator (2015) and newer. Older
-machines won't boot the ISO.
 
 <div align="center">
 
@@ -63,8 +58,6 @@ Fenrir's still early. Roughly where it's headed from here:
 - **Less "under the hood" visible during setup**: a login screen that
   actually matches the desktop is the last obvious seam.
 
-Further out: expanding Fenrir's own package repo beyond just Caelestia —
-part of what separates an independent distro from a CachyOS remix.
 
 ## Building
 
