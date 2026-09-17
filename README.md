@@ -1,5 +1,7 @@
 # Fenrir
 
+[![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
+
 A Linux desktop that's already set up when you boot it. Install it and you
 get [Hyprland](https://hyprland.org/) +
 [Caelestia](https://github.com/caelestia-dots), themed and configured, with
@@ -8,19 +10,13 @@ no dotfiles to edit before it's usable.
 Built with [CachyOS](https://cachyos.org/) as a base, with a different
 desktop stack on top.
 
+**Early alpha.** It started as a personal project and still has rough edges,
+missing polish and the occasional bug. The current build needs an internet
+connection to install, and it's worth backing up anything you care about
+first.
+
 Bug reports, feedback and contributions are welcome, see
 [Contributing](#contributing) below.
-
-<div align="center">
-
-[![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
-
-</div>
-
-<sub>**Early alpha.** It started as a personal project and still has rough
-edges, missing polish and the occasional bug. The current build needs an
-internet connection to install, and it's worth backing up anything you care
-about first.</sub>
 
 ## What's different
 
