@@ -1,7 +1,5 @@
 # Fenrir
 
-[![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
-
 A Linux desktop that's already set up when you boot it. Install it and you
 get [Hyprland](https://hyprland.org/) +
 [Caelestia](https://github.com/caelestia-dots), themed and configured, with
@@ -17,6 +15,12 @@ first.
 
 Bug reports, feedback and contributions are welcome, see
 [Contributing](#contributing) below.
+
+<div align="center">
+
+[![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
+
+</div>
 
 ## What's different
 
