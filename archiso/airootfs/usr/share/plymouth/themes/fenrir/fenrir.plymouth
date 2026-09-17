@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Fenrir
+Description=Fenrir boot splash - a plain loading bar, no spinner
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/fenrir
+ScriptFile=/usr/share/plymouth/themes/fenrir/fenrir.script

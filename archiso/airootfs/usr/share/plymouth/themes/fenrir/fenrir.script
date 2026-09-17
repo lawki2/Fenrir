@@ -1,0 +1,47 @@
+Window.SetBackgroundTopColor(0.133, 0.133, 0.165);
+Window.SetBackgroundBottomColor(0.086, 0.086, 0.106);
+
+progress_box.image = Image("progress_box.png");
+progress_box.sprite = Sprite(progress_box.image);
+progress_box.x = Window.GetX() + Window.GetWidth()  / 2 - progress_box.image.GetWidth()  / 2;
+progress_box.y = Window.GetY() + Window.GetHeight() / 2 - progress_box.image.GetHeight() / 2;
+progress_box.sprite.SetPosition(progress_box.x, progress_box.y, 0);
+
+progress_bar.original_image = Image("progress_bar.png");
+progress_bar.sprite = Sprite();
+progress_bar.x = progress_box.x;
+progress_bar.y = progress_box.y;
+progress_bar.full_width = progress_bar.original_image.GetWidth();
+progress_bar.height = progress_bar.original_image.GetHeight();
+progress_bar.drawn_width = -1;
+
+cap.image = Image("progress_cap.png");
+cap.sprite = Sprite(cap.image);
+cap.sprite.SetPosition(progress_bar.x, progress_bar.y, 2);
+
+# Future logo goes here, centred over the bar at z=3.
+
+fun progress_callback(duration, progress)
+{
+    # Real unit-based progress, from the recorded profile in
+    # /var/lib/plymouth/boot-duration.
+    progress_bar.fraction = progress;
+    if (progress_bar.fraction > 1)
+        progress_bar.fraction = 1;
+
+    progress_bar.width = Math.Int(progress_bar.full_width * progress_bar.fraction);
+    if (progress_bar.width < progress_bar.height)
+        progress_bar.width = progress_bar.height;
+
+    if (progress_bar.width != progress_bar.drawn_width)
+    {
+        progress_bar.drawn_width = progress_bar.width;
+        # Crop, not Scale: scaling squashes the rounded caps into ellipses.
+        progress_bar.image = progress_bar.original_image.Crop(0, 0, progress_bar.width, progress_bar.height);
+        progress_bar.sprite.SetImage(progress_bar.image);
+        progress_bar.sprite.SetPosition(progress_bar.x, progress_bar.y, 1);
+        cap.sprite.SetPosition(progress_bar.x + progress_bar.width - progress_bar.height, progress_bar.y, 2);
+    }
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);

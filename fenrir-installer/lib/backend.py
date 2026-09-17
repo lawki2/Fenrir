@@ -364,6 +364,36 @@ def configure_sudo(progress):
     sudoers_wheel.chmod(0o440)
 
 
+def configure_plymouth(progress):
+    # The package is pacstrapped, but none of its config is - the theme,
+    # plymouthd.conf and the mkinitcpio hook all live in the live image's
+    # own airootfs, so an install gets Plymouth with nothing configured.
+    live_theme = Path("/usr/share/plymouth/themes/fenrir")
+    if not live_theme.is_dir():
+        progress("Skipping boot splash — theme missing from the live image")
+        return
+
+    progress("Setting up the boot splash")
+    target_theme = TARGET / "usr/share/plymouth/themes/fenrir"
+    target_theme.mkdir(parents=True, exist_ok=True)
+    _stream(["cp", "-a", f"{live_theme}/.", f"{target_theme}/"], progress)
+
+    plymouth_dir = TARGET / "etc/plymouth"
+    plymouth_dir.mkdir(parents=True, exist_ok=True)
+    (plymouth_dir / "plymouthd.conf").write_text("[Daemon]\nTheme=fenrir\n")
+
+    # Must happen before finalize_bootloader, which regenerates the
+    # initramfs - the hook has to be in HOOKS by then or the splash never
+    # makes it into the image.
+    mkinitcpio_conf = TARGET / "etc/mkinitcpio.conf"
+    lines = mkinitcpio_conf.read_text().splitlines()
+    for i, line in enumerate(lines):
+        if line.startswith("HOOKS=") and "plymouth" not in line:
+            lines[i] = line.replace("udev", "udev plymouth", 1)
+            break
+    mkinitcpio_conf.write_text("\n".join(lines) + "\n")
+
+
 def configure_kernel_cmdline(root_part, progress):
     # Without this, limine-entry-tool falls back to /proc/cmdline, which
     # under arch-chroot is the live ISO's own boot params, not the target's.
@@ -376,7 +406,9 @@ def configure_kernel_cmdline(root_part, progress):
     ).stdout.strip()
     kernel_dir = TARGET / "etc/kernel"
     kernel_dir.mkdir(parents=True, exist_ok=True)
-    (kernel_dir / "cmdline").write_text(f"rw root=UUID={uuid} rootflags=subvol=@\n")
+    (kernel_dir / "cmdline").write_text(
+        f"rw root=UUID={uuid} rootflags=subvol=@ quiet splash loglevel=3 systemd.show_status=false rd.udev.log_level=3 vt.global_cursor_default=0\n"
+    )
 
 
 def finalize_bootloader(progress):
@@ -452,6 +484,7 @@ def run_install(plan: InstallPlan, progress):
     configure_hostname(plan.hostname, progress)
     create_user(plan.username, plan.full_name, plan.password, progress)
     configure_sudo(progress)
+    configure_plymouth(progress)
     _, root_part = _partition_paths(plan.disk)
     configure_kernel_cmdline(root_part, progress)
     finalize_bootloader(progress)
