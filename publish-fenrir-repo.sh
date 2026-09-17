@@ -37,11 +37,13 @@ repo_name="fenrir"
 gh_pages_url="https://github.com/lawki2/Fenrir.git"
 gh_pages_branch="gh-pages"
 
-# Scope: only these two - fenrir-installer stays build-time-only (always
-# baked fresh into each ISO, never needs a post-install update path), and
-# caelestia-shell's other AUR-built deps (build-local-repo.sh's
-# independent_aur_pkgs) aren't published here either.
-published_pkgs=(caelestia-cli caelestia-shell)
+# The Caelestia stack plus its AUR-only deps - all tiny, and without them an
+# installed system can't resolve a new dep (2.4.0 added qt6-m3shapes-git).
+# Excludes fenrir-installer (live-only) and zen-browser-bin (126MB, not a dep).
+published_pkgs=(
+    caelestia-cli caelestia-shell
+    qt6-m3shapes-git qtengine app2unit python-materialyoucolor libcava ttf-rubik-vf
+)
 
 load_vars "$HOME/.makepkg.conf" || true
 load_vars /etc/makepkg.conf
@@ -51,7 +53,8 @@ rm -rf "$publish_dir"
 mkdir -p "$publish_dir/$arch"
 
 for pkg in "${published_pkgs[@]}"; do
-    pkg_file="$(compgen -G "$repo_dir/${pkg}-*.pkg.tar.zst" | head -1)" || true
+    # Newest by mtime: a glob would sort 2.3.0 ahead of 2.4.0.
+    pkg_file="$(find "$repo_dir" -maxdepth 1 -name "${pkg}-*.pkg.tar.zst" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
     [[ -n "$pkg_file" ]] || die "%s not found in %s - run build-local-repo.sh first." "$pkg" "$repo_dir"
     cp "$pkg_file" "$publish_dir/$arch/"
     sign_with_key "$publish_dir/$arch/$(basename "$pkg_file")"

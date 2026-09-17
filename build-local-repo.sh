@@ -14,7 +14,7 @@ repo_name="fenrir-local"
 mkdir -p "$work_dir" "$repo_dir"
 
 # Packages with no interdependencies among themselves, build first.
-independent_aur_pkgs=(qtengine app2unit python-materialyoucolor libcava ttf-rubik-vf zen-browser-bin)
+independent_aur_pkgs=(qtengine app2unit python-materialyoucolor libcava ttf-rubik-vf zen-browser-bin qt6-m3shapes-git)
 # Depends on packages built in the previous stage.
 caelestia_aur_pkgs=(caelestia-cli caelestia-shell)
 
@@ -22,7 +22,7 @@ caelestia_aur_pkgs=(caelestia-cli caelestia-shell)
 # fenrir-nexus-patches/Toggles.qml on a version bump. Bump deliberately.
 declare -A pinned_aur_commits=(
     [caelestia-cli]="58f0b55e2231476b01ddfb829d20b6fb474b1f1a"   # 1.1.2
-    [caelestia-shell]="0b4bd59c6043fa838c62d00f6fa9457f788c263f" # 2.3.0
+    [caelestia-shell]="e43db3eb47e45935d9c71b7f1b41817c85aa2bcb" # 2.4.0
 )
 
 repo_db="${repo_dir}/${repo_name}.db.tar.gz"
@@ -65,7 +65,8 @@ build_one() {
     local pkg="$1" src="$2" # src: "aur" or an absolute path to a local PKGBUILD dir
     local build_root="$work_dir/$pkg"
     local existing
-    existing="$(compgen -G "$repo_dir/${pkg}-*.pkg.tar.zst" | head -1)" || true
+    # Newest by mtime: a glob would sort 2.3.0 ahead of 2.4.0.
+    existing="$(find "$repo_dir" -maxdepth 1 -name "${pkg}-*.pkg.tar.zst" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
 
     if [[ -n "$existing" ]]; then
         if [[ "$pkg" == "caelestia-shell" ]]; then
