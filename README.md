@@ -11,6 +11,7 @@ here and there. Bug reports, feedback, and contributions are welcome, see
 
 Built with [CachyOS](https://cachyos.org/) as a base with a different desktop stack on top.
 
+
 <div align="center">
 
 [![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
@@ -43,7 +44,7 @@ same as you would for any early-stage OS.
 
 Where it's going from here:
 
-- **Snapshots and rollback** 
+
 - **The rest of the settings page.** 
 - **An offline installer.** 
 - **A first-boot tutorial** 
