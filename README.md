@@ -1,22 +1,22 @@
 # Fenrir
 
-A Linux desktop that's actually finished the moment it boots. Insert the USB,
-install, and you land in a fully themed, fully configured
-[Hyprland](https://hyprland.org/) + [Caelestia](https://github.com/caelestia-dots)
-setup, with no dotfiles to hand-edit and no window manager config to piece
-together before it's usable. Tiling done the way it should feel: fast,
-coherent, and genuinely nice to look at, not just functional.
+A Linux desktop that's already set up when you boot it. Install it and you
+get [Hyprland](https://hyprland.org/) +
+[Caelestia](https://github.com/caelestia-dots), themed and configured, with
+no dotfiles to edit before it's usable.
 
 It started as a personal project and is still early, so expect rough edges
-here and there. Bug reports, feedback, and contributions are welcome; see
+here and there. Bug reports, feedback, and contributions are welcome, see
 [Contributing](#contributing) below.
 
 Under the hood it's still [CachyOS](https://cachyos.org/) (same kernel, same
-package repos) with a different desktop stack layered on top.
+package repos) with a different desktop stack on top.
 
 <div align="center">
 
 [![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
+
+Needs a CPU with AVX2, so roughly 2013 Intel or 2015 AMD and newer.
 
 **Early alpha.** This is an early build. Expect rough edges, missing polish,
 and the occasional bug. Back up anything you care about before installing,
@@ -26,38 +26,33 @@ same as you would for any early-stage OS.
 
 ## What's different
 
-- **Hyprland and Caelestia, already set up.** The live image ships the whole
-  Caelestia shell, dotfiles, and theme wired up, so the live session and any
-  account the installer creates both land in a working, styled desktop rather
-  than a bare tiling WM you're expected to configure first.
-- **An installer that matches the desktop.**
-  [`fenrir-installer`](fenrir-installer/) is a small QML/Quickshell app that
-  reads Caelestia's live colour scheme and themes itself from it, down to the
-  same fonts and motion as the desktop it's about to install. It asks only
-  what needs asking — locale, keyboard, which disk to erase, and a
-  hostname/user/password — and everything it installs is prebuilt, so there's
-  no AUR access or compiling during setup.
-- **Settings you can click instead of edit.** We're in the process of moving
-  the settings that actually matter out of config files and into a real
-  settings page. A good chunk is there already; the rest is being worked
-  through.
+- **Hyprland and Caelestia are already set up.** The live image ships the
+  Caelestia shell, dotfiles and theme wired up. The live session and any
+  account the installer creates both start in a working, themed desktop
+  instead of a bare tiling WM you have to configure first.
+- **The installer looks like the desktop.**
+  [`fenrir-installer`](fenrir-installer/) is a small QML/Quickshell app. It
+  reads Caelestia's colour scheme and themes itself from it, so setup and
+  desktop match. It asks for locale, keyboard, which disk to erase, and a
+  hostname, user and password, and nothing else. Everything it installs is
+  prebuilt, so there's no AUR access or compiling during setup.
+- **Settings are moving out of config files.** A real settings page is
+  slowly taking over from hand-edited configs. A good chunk is done, the
+  rest is being worked through.
 
 ## What's planned
 
-Fenrir's still early. Roughly where it's headed from here:
+Where it's going from here:
 
-- **Snapshots and rollback**, wired right into the boot menu: the safety net
-  that makes trusting a rolling-release distro for daily use feel
-  reasonable.
-- **The rest of the settings app**: window rules and deeper look & feel
-  controls are the main things still living in config files.
-- **A fully offline installer**: no network required, since the live
-  session you're already running has everything it needs.
-- **A proper first-boot tutorial** for anyone new to tiling window
-  managers, beyond the lightweight one in the installer today.
-- **Less "under the hood" visible during setup**: a login screen that
-  actually matches the desktop is the last obvious seam.
-
+- **Snapshots and rollback** in the boot menu, so a bad update isn't a
+  reinstall.
+- **The rest of the settings page.** Window rules and look & feel controls
+  are the main things still living in config files.
+- **An offline installer.** The live session already has everything it
+  needs, so it shouldn't need a network.
+- **A first-boot tutorial** for people new to tiling window managers.
+  There's a small one in the installer now.
+- **A login screen that matches the desktop.**
 
 ## Building
 
@@ -94,10 +89,10 @@ The finished ISO ends up in `out/fenrir/`.
 
 ## Contributing
 
-Bug reports, feedback, and pull requests are all welcome — see
+Bug reports, feedback and pull requests are all welcome. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for how the project's laid out and how
 to get a change reviewed. Just trying it and reporting what broke counts
-too, no formal bug report required.
+too, no formal bug report needed.
 
 ## Attribution
 
