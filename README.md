@@ -8,12 +8,6 @@ no dotfiles to edit before it's usable.
 Built with [CachyOS](https://cachyos.org/) as a base, with a different
 desktop stack on top.
 
-<div align="center">
-
-[![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
-
-</div>
-
 **Early alpha.** It started as a personal project and still has rough edges,
 missing polish and the occasional bug. The current build needs an internet
 connection to install, and it's worth backing up anything you care about
@@ -21,6 +15,12 @@ first.
 
 Bug reports, feedback and contributions are welcome, see
 [Contributing](#contributing) below.
+
+<div align="center">
+
+[![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
+
+</div>
 
 ## What's different
 
