@@ -13,9 +13,12 @@ line behind it. Bug reports, feedback, and contributions are welcome; see
 [Contributing](#contributing) below.
 
 Under the hood it's still [CachyOS](https://cachyos.org/) (same kernel, same
-package repos, same hardware support) with a different desktop stack layered
-on top and its own installer, [`fenrir-installer`](fenrir-installer/),
-replacing Calamares.
+package repos) with a different desktop stack layered on top and its own
+installer, [`fenrir-installer`](fenrir-installer/), replacing Calamares.
+
+Fenrir is built against CachyOS's `x86_64_v3` repositories, so it needs a CPU
+with AVX2 — Intel Haswell (2013) or AMD Excavator (2015) and newer. Older
+machines won't boot the ISO.
 
 <div align="center">
 
