@@ -41,11 +41,10 @@ class InstallPlan:
 
 def _stream(cmd, progress, **kwargs):
     progress(f"+ {' '.join(cmd)}")
-    # stdbuf forces line buffering (piped output is block-buffered
-    # otherwise, so pacstrap's progress arrives in one late burst);
-    # nice/ionice keep this from starving the compositor thread.
+    # stdbuf forces line buffering so pacstrap's progress streams live;
+    # nice stops it starving the compositor.
     proc = subprocess.Popen(
-        ["nice", "-n", "10", "ionice", "-c2", "-n7", "stdbuf", "-oL", "-eL", *cmd],
+        ["nice", "-n", "10", "stdbuf", "-oL", "-eL", *cmd],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
