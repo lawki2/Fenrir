@@ -9,14 +9,14 @@ It started as a personal project and is still early, so expect rough edges
 here and there. Bug reports, feedback, and contributions are welcome, see
 [Contributing](#contributing) below.
 
-Built with [CachyOS](https://cachyos.org/) as a base with a different desktop stack on top.
-
+Built with [CachyOS](https://cachyos.org/) as a base, with a different
+desktop stack on top.
 
 <div align="center">
 
 [![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
 
-For the current build you need to connect to the internet before trying to install using the installer.
+The current build needs an internet connection to install.
 
 **Early alpha.** This is an early build. Expect rough edges, missing polish,
 and the occasional bug. Back up anything you care about before installing,
@@ -44,10 +44,9 @@ same as you would for any early-stage OS.
 
 Where it's going from here:
 
-
-- **The rest of the settings page.** 
-- **An offline installer.** 
-- **A first-boot tutorial** 
+- **The rest of the settings page.**
+- **An offline installer.**
+- **A first-boot tutorial.**
 - **A login screen that matches the desktop.**
 
 ## Building
