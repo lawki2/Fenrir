@@ -13,6 +13,8 @@ desktop stack on top.
 
 <div align="center">
 
+<br>
+
 [![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
 
 The current build needs an internet connection to install.
