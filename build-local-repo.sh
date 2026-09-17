@@ -25,6 +25,14 @@ declare -A pinned_aur_commits=(
     [caelestia-shell]="e43db3eb47e45935d9c71b7f1b41817c85aa2bcb" # 2.4.0
 )
 
+# Bump when a package must be rebuilt against updated deps (a Qt/quickshell
+# rebuild, say) with no upstream version change. Appends to pkgrel, so
+# 2.3.0-1 becomes 2.3.0-1.1 and pacman sees it as newer.
+declare -A fenrir_rebuild=(
+    [caelestia-cli]=1
+    [caelestia-shell]=7
+)
+
 repo_db="${repo_dir}/${repo_name}.db.tar.gz"
 
 ensure_repo_db() {
@@ -68,6 +76,14 @@ build_one() {
     # Newest by mtime: a glob would sort 2.3.0 ahead of 2.4.0.
     existing="$(find "$repo_dir" -maxdepth 1 -name "${pkg}-*.pkg.tar.zst" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
 
+    local rebuild="${fenrir_rebuild[$pkg]:-0}"
+    local marker="$work_dir/.rebuild-${pkg}"
+    if [[ -n "$existing" && "$(cat "$marker" 2>/dev/null || echo 0)" != "$rebuild" ]]; then
+        echo "==> $pkg rebuild counter is now $rebuild, forcing rebuild"
+        rm -f "$repo_dir/${pkg}"-*.pkg.tar.zst
+        existing=""
+    fi
+
     if [[ -n "$existing" ]]; then
         if [[ "$pkg" == "caelestia-shell" ]]; then
             # caelestia-shell splices in fenrir-nexus-patches/ and the
@@ -109,6 +125,10 @@ build_one() {
         cp -r "$src"/* "$build_root"/
     fi
 
+    if (( rebuild > 0 )); then
+        sed -i -E "s/^pkgrel=([0-9]+(\.[0-9]+)*)\$/pkgrel=\1.${rebuild}/" "$build_root/PKGBUILD"
+    fi
+
     if [[ "$pkg" == "caelestia-shell" ]]; then
         # CachyOS's quickshell-git is a stale snapshot predating "DefaultEnv"
         # pragma support that shell.qml requires; build against quickshell instead.
@@ -146,6 +166,7 @@ build_one() {
 
     cp "$build_root"/*.pkg.tar.zst "$repo_dir"/
     repo-add "$repo_db" "$repo_dir"/"${pkg}"-*.pkg.tar.zst
+    echo "$rebuild" > "$marker"
 }
 
 ensure_repo_db
