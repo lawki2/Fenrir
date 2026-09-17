@@ -202,7 +202,7 @@ polkit-gnome
 gnome-keyring
 thunar
 quickshell
-pamac-aur
+shelly
 
 # Security. Enabled by default with its standard policy at install time,
 # see fenrir-installer/lib/backend.py's configure_firewall().
