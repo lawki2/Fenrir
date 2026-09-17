@@ -57,7 +57,6 @@ same as you would for any early-stage OS.
   display layout, keybinds, and the firewall — all editable from a GUI,
   no dotfiles required.
 
-
 ## What's planned
 
 Fenrir's still early. Roughly where it's headed from here:
