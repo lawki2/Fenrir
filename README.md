@@ -14,6 +14,7 @@ Built with [CachyOS](https://cachyos.org/) as a base with a different desktop st
 <div align="center">
 
 [![Download Fenrir ISO](https://img.shields.io/badge/Download-Fenrir%20ISO-897324?style=for-the-badge&logo=linux&logoColor=white)](https://sourceforge.net/projects/fenrir-os/)
+
 For the current build you need to connect to the internet before trying to install using the installer.
 
 **Early alpha.** This is an early build. Expect rough edges, missing polish,
