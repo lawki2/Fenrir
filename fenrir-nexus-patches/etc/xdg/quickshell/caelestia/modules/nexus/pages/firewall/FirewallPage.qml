@@ -11,104 +11,107 @@ import qs.components.controls
 import qs.services
 import qs.modules.nexus.common
 
-// ufw itself requires root for every subcommand, including plain `status`
-// (confirmed: ufw's own _do_checks() runs unconditionally) - reading
-// /etc/ufw/ufw.conf's ENABLED= line directly instead avoids prompting for
-// auth just to open this page (the file is world-readable, 644 root:root).
-// The rule list has no such shortcut (ufw has no machine-readable output
-// mode, and /etc/ufw/user.rules is raw iptables-restore syntax not worth
-// hand-parsing/writing when ufw's own CLI already does that safely), so
-// listing/adding/removing rules goes through `pkexec ufw status numbered`/
-// `allow`/`deny`/`delete` - polkit's default org.freedesktop.policykit.exec
-// action already prompts wheel-group users for their own password, no
-// extra polkit/sudoers rule needed (confirmed empirically).
+// firewall-cmd and systemctl both talk D-Bus as the calling user, so nothing
+// here goes through pkexec - polkit gates the D-Bus call itself, and
+// backend.py's configure_polkit() grants the actions this page uses to local
+// active wheel users, so none of it prompts.
+//
+// Reads are one --list-all (services and ports in a single call); writes are
+// --permanent so they survive a reboot, then --reload to apply them live.
 PageBase {
     id: root
 
     title: qsTr("Firewall")
 
-    property bool ufwEnabled: false
-    property bool rulesLoading: true
-    property bool rulesLoadFailed: false
-    property var rules: []
-    property string newRuleSpec: ""
-    // Shared across toggle/add/delete since the busy-guards below mean at
-    // most one of those can ever be in flight at a time - a cancelled
-    // pkexec prompt or an invalid rule spec used to just silently refresh
-    // back to the unchanged state with nothing telling the user their
-    // click didn't do what they expected.
+    readonly property string zone: "public"
+
+    property bool running: false
+    property bool loading: true
+    property string loadError: ""
     property string actionError: ""
+    property var services: []
+    property var ports: []
+    property string newPortSpec: ""
 
-    function refreshStatus(): void {
-        statusProc.running = true;
+    // No synthetic "default policy" row: in firewalld a zone's services and
+    // ports *are* its rules, and the block-incoming part is the zone target,
+    // which the toggle above already represents.
+    readonly property var allRows: [
+        ...root.services.map(s => ({
+                    kind: "service",
+                    label: s,
+                    sublabel: qsTr("Service"),
+                    action: "ALLOW",
+                    value: s
+                })),
+        ...root.ports.map(p => ({
+                    kind: "port",
+                    label: p,
+                    sublabel: qsTr("Port"),
+                    action: "ALLOW",
+                    value: p
+                }))
+    ]
+
+    // Every firewall-cmd run is a separate D-Bus call and so a separate
+    // polkit check - --list-all covers services and ports in one, keeping
+    // this to two calls instead of four.
+    function refresh(): void {
+        root.loading = true;
+        root.loadError = "";
+        infoProc.running = true;
     }
 
-    function refreshRules(): void {
-        root.rulesLoading = true;
-        root.rulesLoadFailed = false;
-        rulesProc.running = true;
+    function parseZoneInfo(text: string): void {
+        const fields = {};
+        for (const line of text.split("\n")) {
+            const m = line.match(/^\s+(services|ports|target):\s*(.*)$/);
+            if (m)
+                fields[m[1]] = m[2].trim();
+        }
+        const split = v => (v ?? "").split(/\s+/).filter(s => s.length);
+        root.services = split(fields.services);
+        root.ports = split(fields.ports);
     }
 
+    // Permanent config only becomes live on reload, so every change chains
+    // into one - anything else silently wouldn't take effect until reboot.
+    // args stays `var` so it's a plain JS array - spreading a QML
+    // list<string> through the proxy is not reliable.
+    function applyChange(args: var): void {
+        if (changeProc.running || reloadProc.running)
+            return;
+        root.actionError = "";
+        changeProc.command = ["firewall-cmd", "--permanent", `--zone=${root.zone}`, ...args];
+        changeProc.running = true;
+    }
+
+    // A literal enable/disable of the service, not a zone swap. systemctl
+    // reaches PID 1 over D-Bus, so polkit gates it - no pkexec needed.
     function setEnabled(on: bool): void {
         if (toggleProc.running)
             return;
-        toggleProc.command = ["pkexec", "ufw", "--force", on ? "enable" : "disable"];
+        root.actionError = "";
+        toggleProc.command = ["systemctl", on ? "enable" : "disable", "--now", "firewalld"];
         toggleProc.running = true;
     }
 
-    function addRule(spec: string, allow: bool): void {
-        if (ruleActionProc.running)
-            return;
+    function addPort(spec: string): void {
         const trimmed = spec.trim();
         if (!trimmed.length)
             return;
-        root.newRuleSpec = "";
-        ruleActionProc.command = ["pkexec", "ufw", "--force", allow ? "allow" : "deny", trimmed];
-        ruleActionProc.running = true;
+        root.newPortSpec = "";
+        root.applyChange([`--add-port=${trimmed}`]);
     }
 
-    function deleteRule(number: int): void {
-        if (ruleActionProc.running)
-            return;
-        ruleActionProc.command = ["pkexec", "ufw", "--force", "delete", String(number)];
-        ruleActionProc.running = true;
+    function removeRow(row: var): void {
+        if (row.kind === "service")
+            root.applyChange([`--remove-service=${row.value}`]);
+        else if (row.kind === "port")
+            root.applyChange([`--remove-port=${row.value}`]);
     }
 
-    // `ufw status numbered` has no machine-readable mode - each rule line
-    // looks like "[ 1] 22/tcp                     ALLOW IN    Anywhere",
-    // padded with runs of spaces between columns, so split on 2+ spaces
-    // rather than a single one. Best-effort display parsing: a line this
-    // doesn't match (the "Status:" line, the "To ... Action ... From"
-    // header, blank lines) is simply skipped, never a wrong rule.
-    function parseRules(text: string): void {
-        const result = [];
-        for (const line of text.split("\n")) {
-            const m = line.match(/^\[\s*(\d+)\]\s+(.*)$/);
-            if (!m)
-                continue;
-            const cols = m[2].trim().split(/\s{2,}/);
-            // A future ufw version reflowing its column widths (e.g.
-            // single-space padding for a long port range) could otherwise
-            // silently produce a wrong to/action/from split instead of
-            // just dropping the row - requiring the expected column count
-            // and a real ufw action keyword in the action slot turns that
-            // into "skip this line" instead of "display wrong data".
-            if (cols.length < 3 || !/^(ALLOW|DENY|REJECT|LIMIT)/.test(cols[1]))
-                continue;
-            result.push({
-                number: parseInt(m[1], 10),
-                to: cols[0],
-                action: cols[1],
-                from: cols[2]
-            });
-        }
-        root.rules = result;
-    }
-
-    Component.onCompleted: {
-        root.refreshStatus();
-        root.refreshRules();
-    }
+    Component.onCompleted: root.refresh()
 
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -116,53 +119,86 @@ PageBase {
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 
-        // PageBase's default property is a single Item (its scrollable
-        // page content), not a generic child list - a Process placed as
-        // a direct PageBase child fails with "Cannot assign object of
-        // type Process to property of type QQuickItem*" (confirmed via
-        // serial.log). ColumnLayout, being a plain Item underneath, has
-        // no such restriction, so these live nested in here instead -
-        // same fix as KeybindsPage.qml's FileView already being nested
-        // in its own ColumnLayout rather than a direct PageBase child.
-        Process {
-            id: statusProc
-            command: ["cat", "/etc/ufw/ufw.conf"]
-            stdout: StdioCollector {
-                onStreamFinished: root.ufwEnabled = text.includes("ENABLED=yes")
-            }
-        }
-
+        // PageBase's default property is a single Item, so every non-Item
+        // lives in here rather than directly under PageBase.
+        //
+        // Control flow hangs off onExited, which always has the exit code;
+        // stdout/stderr text is stashed in properties and read reactively,
+        // because streamFinished and exited can arrive in either order.
         Process {
             id: toggleProc
+
+            property string err: ""
+
+            stderr: StdioCollector {
+                onStreamFinished: toggleProc.err = text.trim()
+            }
             onExited: exitCode => {
-                root.actionError = exitCode === 0 ? "" : qsTr("Couldn't change the firewall state — the password prompt may have been cancelled.");
-                root.refreshStatus();
+                if (exitCode !== 0)
+                    root.actionError = toggleProc.err || qsTr("Couldn't start or stop the firewall (exit %1).").arg(exitCode);
+                root.refresh();
             }
         }
 
         Process {
-            id: rulesProc
-            command: ["pkexec", "ufw", "status", "numbered"]
+            id: infoProc
+
+            property string out: ""
+
+            command: ["firewall-cmd", "--permanent", `--zone=${root.zone}`, "--list-all"]
             stdout: StdioCollector {
-                id: rulesCollector
+                onStreamFinished: infoProc.out = text
             }
+            stderr: StdioCollector {
+                onStreamFinished: if (text.trim().length)
+                    root.loadError = text.trim()
+            }
+            // --permanent still goes through the daemon, so a non-zero exit
+            // here is also how we know firewalld isn't running.
             onExited: exitCode => {
-                root.rulesLoading = false;
+                root.loading = false;
+                root.running = exitCode === 0;
+                enableToggle.checked = root.running;
                 if (exitCode === 0) {
-                    root.rulesLoadFailed = false;
-                    root.parseRules(rulesCollector.text);
+                    root.parseZoneInfo(infoProc.out);
                 } else {
-                    root.rulesLoadFailed = true;
-                    root.rules = [];
+                    root.services = [];
+                    root.ports = [];
                 }
             }
         }
 
         Process {
-            id: ruleActionProc
+            id: changeProc
+
+            property string err: ""
+
+            stderr: StdioCollector {
+                onStreamFinished: changeProc.err = text.trim()
+            }
             onExited: exitCode => {
-                root.actionError = exitCode === 0 ? "" : qsTr("Couldn't apply that — check the port/service format, or the password prompt may have been cancelled.");
-                root.refreshRules();
+                if (exitCode === 0) {
+                    reloadProc.running = true;
+                } else {
+                    root.actionError = changeProc.err || qsTr("That change was rejected (exit %1).").arg(exitCode);
+                    root.refresh();
+                }
+            }
+        }
+
+        Process {
+            id: reloadProc
+
+            property string err: ""
+
+            command: ["firewall-cmd", "--reload"]
+            stderr: StdioCollector {
+                onStreamFinished: reloadProc.err = text.trim()
+            }
+            onExited: exitCode => {
+                if (exitCode !== 0)
+                    root.actionError = reloadProc.err || qsTr("Couldn't reload the firewall (exit %1).").arg(exitCode);
+                root.refresh();
             }
         }
 
@@ -171,14 +207,29 @@ PageBase {
             text: qsTr("Firewall")
         }
 
+        // checked is assigned imperatively, never bound - the first toggle
+        // would destroy a binding for good.
         ToggleRow {
+            id: enableToggle
+
             first: true
             last: true
-            disabled: toggleProc.running
+            disabled: toggleProc.running || changeProc.running || reloadProc.running
             text: qsTr("Enable firewall")
             subtext: qsTr("Blocks unsolicited incoming connections; outgoing traffic is unaffected")
-            checked: root.ufwEnabled
             onToggled: root.setEnabled(checked)
+        }
+
+        StyledText {
+            visible: !root.running
+            Layout.fillWidth: true
+            Layout.leftMargin: Tokens.padding.largeIncreased
+            Layout.rightMargin: Tokens.padding.largeIncreased
+            Layout.topMargin: Tokens.spacing.small
+            wrapMode: Text.WordWrap
+            text: qsTr("The firewalld service isn't running — start it with “systemctl enable --now firewalld”.")
+            color: Colours.palette.m3error
+            font: Tokens.font.body.small
         }
 
         StyledText {
@@ -186,6 +237,7 @@ PageBase {
             Layout.fillWidth: true
             Layout.leftMargin: Tokens.padding.largeIncreased
             Layout.rightMargin: Tokens.padding.largeIncreased
+            Layout.topMargin: Tokens.spacing.small
             wrapMode: Text.WordWrap
             text: root.actionError
             color: Colours.palette.m3error
@@ -193,34 +245,32 @@ PageBase {
         }
 
         SectionHeader {
-            text: qsTr("Default policy")
+            text: qsTr("Rules")
         }
 
         StyledText {
+            visible: root.loadError.length > 0
             Layout.fillWidth: true
             Layout.leftMargin: Tokens.padding.largeIncreased
             Layout.rightMargin: Tokens.padding.largeIncreased
+            Layout.bottomMargin: Tokens.spacing.small
             wrapMode: Text.WordWrap
-            text: qsTr("Deny incoming, allow outgoing — the standard ufw policy, enabled by default on install.")
-            color: Colours.palette.m3outline
+            text: root.loadError
+            color: Colours.palette.m3error
             font: Tokens.font.body.small
-        }
-
-        SectionHeader {
-            text: qsTr("Rules")
         }
 
         ItemList {
             id: ruleList
 
-            showList: root.rules.length > 0
+            showList: root.allRows.length > 0
             first: true
             last: true
-            placeholderIcon: root.rulesLoadFailed ? "error" : "rule"
-            placeholderText: root.rulesLoading ? qsTr("Loading…") : root.rulesLoadFailed ? qsTr("Couldn't load rules — try reopening this page") : qsTr("No rules yet")
+            placeholderIcon: "rule"
+            placeholderText: root.loading ? qsTr("Loading…") : qsTr("No rules yet")
 
             model: ScriptModel {
-                values: root.rules
+                values: root.allRows
             }
 
             delegate: Item {
@@ -248,14 +298,14 @@ PageBase {
 
                         StyledText {
                             Layout.fillWidth: true
-                            text: ruleRow.modelData.to
+                            text: ruleRow.modelData.label
                             font: Tokens.font.body.small
                             elide: Text.ElideRight
                         }
 
                         StyledText {
                             Layout.fillWidth: true
-                            text: ruleRow.modelData.from
+                            text: ruleRow.modelData.sublabel
                             color: Colours.palette.m3outline
                             font: Tokens.font.label.small
                             elide: Text.ElideRight
@@ -264,16 +314,19 @@ PageBase {
 
                     StyledText {
                         text: ruleRow.modelData.action
-                        color: ruleRow.modelData.action.startsWith("ALLOW") ? Colours.palette.m3primary : Colours.palette.m3error
+                        color: ruleRow.modelData.action === "ALLOW" ? Colours.palette.m3primary : Colours.palette.m3error
                         font: Tokens.font.label.small
                     }
 
+                    // Default policies are changed with the toggle above, not
+                    // deleted, so they get no delete affordance.
                     StateLayer {
-                        implicitWidth: 32
+                        visible: ruleRow.modelData.kind !== "default"
+                        implicitWidth: visible ? 32 : 0
                         implicitHeight: 32
                         radius: height / 2
-                        disabled: ruleActionProc.running
-                        onClicked: root.deleteRule(ruleRow.modelData.number)
+                        disabled: changeProc.running || reloadProc.running
+                        onClicked: root.removeRow(ruleRow.modelData)
 
                         MaterialIcon {
                             anchors.centerIn: parent
@@ -287,17 +340,17 @@ PageBase {
         }
 
         SectionHeader {
-            text: qsTr("Add rule")
+            text: qsTr("Allow a port")
         }
 
         TextFieldRow {
             first: true
             last: true
-            label: qsTr("Port / service")
-            subtext: qsTr("e.g. \"22/tcp\", \"80\", \"1000:2000/udp\"")
+            label: qsTr("Port / protocol")
+            subtext: qsTr("e.g. \"22/tcp\", \"1000-2000/udp\"")
             placeholderText: qsTr("22/tcp")
-            value: root.newRuleSpec
-            onValueEdited: value => root.newRuleSpec = value
+            value: root.newPortSpec
+            onValueEdited: value => root.newPortSpec = value
         }
 
         ButtonRow {
@@ -305,45 +358,28 @@ PageBase {
             Layout.topMargin: Tokens.spacing.small
             spacing: Tokens.spacing.small
 
-            ActionButton {
-                disabled: ruleActionProc.running
-                text: qsTr("Allow")
-                bg: Colours.palette.m3primaryContainer
-                fg: Colours.palette.m3onPrimaryContainer
-                onClicked: root.addRule(root.newRuleSpec, true)
+            ButtonBase {
+                id: allowBtn
+
+                fillWidth: true
+                shapeMorph: true
+                isRound: true
+                disabled: changeProc.running || reloadProc.running
+                inactiveColour: Colours.palette.m3primaryContainer
+                inactiveOnColour: Colours.palette.m3onPrimaryContainer
+                implicitHeight: allowLabel.implicitHeight + Tokens.padding.medium * 2
+                implicitWidth: allowLabel.implicitWidth + Tokens.padding.large * 2
+                onClicked: root.addPort(root.newPortSpec)
+
+                StyledText {
+                    id: allowLabel
+
+                    anchors.centerIn: parent
+                    text: qsTr("Allow")
+                    color: allowBtn.onColour
+                    font: Tokens.font.body.small
+                }
             }
-
-            ActionButton {
-                disabled: ruleActionProc.running
-                text: qsTr("Deny")
-                bg: Colours.palette.m3errorContainer
-                fg: Colours.palette.m3onErrorContainer
-                onClicked: root.addRule(root.newRuleSpec, false)
-            }
-        }
-    }
-
-    component ActionButton: ButtonBase {
-        id: btn
-
-        property alias text: label.text
-        property color bg
-        property color fg
-
-        fillWidth: true
-        shapeMorph: true
-        isRound: true
-        inactiveColour: btn.bg
-        inactiveOnColour: btn.fg
-        implicitHeight: label.implicitHeight + Tokens.padding.medium * 2
-        implicitWidth: label.implicitWidth + Tokens.padding.large * 2
-
-        StyledText {
-            id: label
-
-            anchors.centerIn: parent
-            color: btn.onColour
-            font: Tokens.font.body.small
         }
     }
 }

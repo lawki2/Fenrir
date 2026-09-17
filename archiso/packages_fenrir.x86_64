@@ -203,9 +203,10 @@ thunar
 quickshell
 shelly
 
-# Security. Enabled by default with its standard policy at install time,
-# see fenrir-installer/lib/backend.py's configure_firewall().
-ufw
+# Security. Enabled by default at install time, see backend.py's
+# configure_firewall(). firewalld over ufw for its D-Bus + polkit API,
+# which the Nexus firewall page talks to directly.
+firewalld
 
 # AUR built packages, see build-local-repo.sh and local-repo.
 qtengine

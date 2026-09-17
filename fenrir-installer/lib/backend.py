@@ -364,6 +364,37 @@ def configure_sudo(progress):
     sudoers_wheel.chmod(0o440)
 
 
+def configure_polkit(progress):
+    # Clock and firewall changes from Nexus don't prompt: a local, active
+    # wheel user can already sudo anything, so this removes friction rather
+    # than a barrier. Only the three FirewallD actions the page actually
+    # uses are granted - .direct and .policies stay at auth_admin_keep.
+    # The systemd grant is scoped to firewalld.service; if systemd doesn't
+    # supply the "unit" detail the rule just won't match and the user gets
+    # the normal prompt, so it can never over-grant.
+    progress("Allowing clock and firewall changes without a password")
+    rules_dir = TARGET / "etc/polkit-1/rules.d"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    (rules_dir / "50-fenrir.rules").write_text(
+        "polkit.addRule(function(action, subject) {\n"
+        '    if (!subject.isInGroup("wheel") || !subject.local || !subject.active)\n'
+        "        return polkit.Result.NOT_HANDLED;\n"
+        '    if (action.id.indexOf("org.freedesktop.timedate1.") === 0 ||\n'
+        '        action.id === "org.fedoraproject.FirewallD1.info" ||\n'
+        '        action.id === "org.fedoraproject.FirewallD1.config.info" ||\n'
+        '        action.id === "org.fedoraproject.FirewallD1.config") {\n'
+        "        return polkit.Result.YES;\n"
+        "    }\n"
+        '    if ((action.id === "org.freedesktop.systemd1.manage-units" ||\n'
+        '         action.id === "org.freedesktop.systemd1.manage-unit-files") &&\n'
+        '        action.lookup("unit") === "firewalld.service") {\n'
+        "        return polkit.Result.YES;\n"
+        "    }\n"
+        "    return polkit.Result.NOT_HANDLED;\n"
+        "});\n"
+    )
+
+
 def configure_plymouth(progress):
     # The package is pacstrapped, but none of its config is - the theme,
     # plymouthd.conf and the mkinitcpio hook all live in the live image's
@@ -430,7 +461,7 @@ def finalize_bootloader(progress):
     limine_conf.write_text("\n".join(lines) + "\n")
 
 
-ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "sddm", "ufw")
+ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "sddm", "firewalld")
 
 
 def enable_services(progress):
@@ -439,21 +470,44 @@ def enable_services(progress):
         _chroot(["systemctl", "enable", service], progress)
 
 
+# Dropped vs firewalld's stock public zone: ssh. sshd is enabled only on the
+# live ISO, never on an installed system, so port 22 would be pure attack
+# surface. The rest are the desktop cases that otherwise fail silently later -
+# printer/device discovery, casting, phone pairing, Steam Remote Play. Each is
+# inert until the matching app is actually installed and listening.
+DEFAULT_ZONE_SERVICES = ("dhcpv6-client", "mdns", "ssdp", "kdeconnect", "steam-streaming")
+
+
 def configure_firewall(progress):
-    # Flip ENABLED directly rather than `ufw enable`, which would also
-    # try to apply the ruleset through netfilter mid-chroot.
+    # Written as a zone override in /etc/firewalld/zones, which firewalld
+    # reads in preference to /usr/lib/firewalld/zones - no daemon needed, so
+    # this works inside the chroot where firewall-cmd would not.
     progress("Enabling firewall")
-    (TARGET / "etc/ufw/ufw.conf").write_text(
-        "# /etc/ufw/ufw.conf\n"
-        "#\n"
-        "\n"
-        "# Set to yes to start on boot. If setting this remotely, be sure to add a rule\n"
-        "# to allow your remote connection before starting ufw. Eg: 'ufw allow 22/tcp'\n"
-        "ENABLED=yes\n"
-        "\n"
-        "# Please use the 'ufw' command to set the loglevel. Eg: 'ufw logging medium'.\n"
-        "# See 'man ufw' for details.\n"
-        "LOGLEVEL=low\n"
+
+    conf = TARGET / "etc/firewalld/firewalld.conf"
+    if not conf.exists():
+        raise InstallError(f"{conf} is missing — is firewalld installed?")
+    lines = conf.read_text().splitlines()
+    for i, line in enumerate(lines):
+        if line.startswith("DefaultZone="):
+            lines[i] = "DefaultZone=public"
+            break
+    else:
+        lines.append("DefaultZone=public")
+    conf.write_text("\n".join(lines) + "\n")
+
+    services = "\n".join(f'  <service name="{s}"/>' for s in DEFAULT_ZONE_SERVICES)
+    zones_dir = TARGET / "etc/firewalld/zones"
+    zones_dir.mkdir(parents=True, exist_ok=True)
+    (zones_dir / "public.xml").write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        "<zone>\n"
+        "  <short>Public</short>\n"
+        "  <description>Only selected incoming connections are accepted."
+        " Outgoing traffic is unrestricted.</description>\n"
+        f"{services}\n"
+        "  <forward/>\n"
+        "</zone>\n"
     )
 
 
@@ -484,6 +538,7 @@ def run_install(plan: InstallPlan, progress):
     configure_hostname(plan.hostname, progress)
     create_user(plan.username, plan.full_name, plan.password, progress)
     configure_sudo(progress)
+    configure_polkit(progress)
     configure_plymouth(progress)
     _, root_part = _partition_paths(plan.disk)
     configure_kernel_cmdline(root_part, progress)
