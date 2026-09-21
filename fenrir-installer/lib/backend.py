@@ -2,6 +2,7 @@
 Runs as root already (launched via pkexec) — no escalation happens here.
 """
 
+import re
 import subprocess
 import time
 from dataclasses import dataclass
@@ -416,12 +417,28 @@ def configure_plymouth(progress):
     # Must happen before finalize_bootloader, which regenerates the
     # initramfs - the hook has to be in HOOKS by then or the splash never
     # makes it into the image.
+    # The hook goes after whichever initrd flavour is in use. mkinitcpio's
+    # current default is systemd-based and has no "udev" token at all, so
+    # anchoring only on udev silently did nothing and the splash never
+    # reached the installed system.
     mkinitcpio_conf = TARGET / "etc/mkinitcpio.conf"
     lines = mkinitcpio_conf.read_text().splitlines()
     for i, line in enumerate(lines):
-        if line.startswith("HOOKS=") and "plymouth" not in line:
-            lines[i] = line.replace("udev", "udev plymouth", 1)
+        if not line.startswith("HOOKS="):
+            continue
+        if "plymouth" in line:
             break
+        for anchor in ("systemd", "udev"):
+            if re.search(rf"\b{anchor}\b", line):
+                lines[i] = re.sub(rf"\b{anchor}\b", f"{anchor} plymouth", line, count=1)
+                break
+        else:
+            raise InstallError(
+                f"No systemd or udev hook in {mkinitcpio_conf}; can't place the plymouth hook"
+            )
+        break
+    else:
+        raise InstallError(f"No HOOKS= line in {mkinitcpio_conf}")
     mkinitcpio_conf.write_text("\n".join(lines) + "\n")
 
 
