@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Line-delimited bridge between the QML greeter and greetd.
+
+greetd frames messages as a native-order u32 length plus UTF-8 JSON, which
+Quickshell's Socket can't parse (it only has delimiter and collect-all
+parsers). This speaks newline-delimited JSON on stdin/stdout instead, so the
+greeter can drive it with a plain Process + SplitParser.
+"""
+
+import json
+import os
+import socket
+import struct
+import sys
+import threading
+
+HEADER = struct.Struct("=I")  # native byte order, per greetd-ipc(7)
+
+
+def send(sock, payload: bytes) -> None:
+    sock.sendall(HEADER.pack(len(payload)) + payload)
+
+
+def recv_exactly(sock, n: int) -> bytes:
+    buf = b""
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            raise ConnectionError("greetd closed the connection")
+        buf += chunk
+    return buf
+
+
+def emit(obj) -> None:
+    sys.stdout.write(json.dumps(obj) + "\n")
+    sys.stdout.flush()
+
+
+def pump(sock) -> None:
+    """greetd -> stdout, one JSON object per line."""
+    try:
+        while True:
+            header = sock.recv(HEADER.size, socket.MSG_WAITALL)
+            if not header:
+                # greetd closes the socket after a successful start_session;
+                # reporting that as an error would flash a login failure at
+                # the moment login actually worked.
+                emit({"type": "closed"})
+                return
+            (length,) = HEADER.unpack(header)
+            emit(json.loads(recv_exactly(sock, length).decode()))
+    except Exception as e:
+        emit({"type": "error", "error_type": "error", "description": str(e)})
+
+
+def main() -> int:
+    path = os.environ.get("GREETD_SOCK")
+    if not path:
+        emit({"type": "error", "error_type": "error", "description": "GREETD_SOCK is not set"})
+        return 1
+
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.connect(path)
+    reader = threading.Thread(target=pump, args=(sock,), daemon=True)
+    reader.start()
+
+    for line in sys.stdin:
+        line = line.strip()
+        if line:
+            send(sock, line.encode())
+
+    # stdin closing must not drop replies still in flight: half-close so
+    # greetd sees EOF, then let the reader drain before exiting.
+    try:
+        sock.shutdown(socket.SHUT_WR)
+    except OSError:
+        pass
+    reader.join(timeout=5)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
