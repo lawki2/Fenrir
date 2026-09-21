@@ -3,7 +3,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Wayland
 import Caelestia.Config
 import qs.components
 import qs.components.controls
@@ -14,25 +13,30 @@ import qs.services
 import qs.common
 import qs.modules.nexus.common
 
-// A layer-shell surface rather than a floating app window: an opaque toplevel
-// can never match the rest of the desktop, because Caelestia's own surfaces
-// are transparent layers that Hyprland blurs behind. Full-screen and
-// transparent, with the actual UI in a centred translucent panel.
-PanelWindow {
+// Shaped like Nexus's own window (modules/nexus/WindowFactory.qml): a real
+// FloatingWindow with surfaceFormat.opaque false, which is what actually lets
+// the transparent surface show through - the original installer painted an
+// opaque colour and never set it, which is why it never looked translucent.
+// Sized from the screen by ratio rather than a fixed pixel size, so it scales
+// the way the settings window does.
+FloatingWindow {
     id: root
 
-    readonly property int panelWidth: 780
-    readonly property int panelHeight: 560
+    color: Colours.tPalette.m3surface
+    surfaceFormat.opaque: false
 
-    WlrLayershell.namespace: "fenrir-installer"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    implicitWidth: Math.round(implicitHeight * contentItem.Tokens.sizes.nexus.ratio)
+    implicitHeight: Math.round(screen.height * contentItem.Tokens.sizes.nexus.heightMult)
 
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-    color: "transparent"
+    minimumSize.width: contentItem.Tokens.sizes.nexus.minWidth
+    minimumSize.height: contentItem.Tokens.sizes.nexus.minHeight
+
+    // Nexus scopes both of these per screen; without them Config/Tokens warn
+    // when read from a singleton and fall back to the wrong screen's values.
+    contentItem.Config.screen: screen.name
+    contentItem.Tokens.screen: screen.name
+
+    title: qsTr("Install Fenrir")
 
     readonly property var pageOrder: [
         "welcome",
@@ -59,21 +63,10 @@ PanelWindow {
         password: ""
     })
 
-    Rectangle {
-        id: panel
-
-        anchors.centerIn: parent
-        implicitWidth: root.panelWidth
-        implicitHeight: root.panelHeight
-        radius: TokenConfig.appearance.rounding.large
-        // tPalette applies Colours.layer(), the same alpha Caelestia's own
-        // surfaces use, so Hyprland's blur shows through exactly as it does
-        // behind the shell.
-        color: Colours.tPalette.m3surface
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: TokenConfig.appearance.spacing.large
+        anchors.margins: Tokens.padding.extraLarge
         spacing: TokenConfig.appearance.spacing.medium
 
         Loader {
@@ -208,7 +201,6 @@ PanelWindow {
                 }
             }
         }
-    }
     }
 
     Rectangle {
