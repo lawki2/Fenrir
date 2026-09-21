@@ -129,6 +129,19 @@ build_one() {
         sed -i -E "s/^pkgrel=([0-9]+(\.[0-9]+)*)\$/pkgrel=\1.${rebuild}/" "$build_root/PKGBUILD"
     fi
 
+    if [[ "$pkg" == "caelestia-cli" ]]; then
+        # Ships Fenrir's own colour scheme alongside the built-in ones, so it
+        # shows up in the scheme picker and not just in skel's scheme.json.
+        if ! grep -qF 'python -m installer --destdir' "$build_root/PKGBUILD"; then
+            echo "==> caelestia-cli's PKGBUILD no longer has the expected installer" \
+                "line - the Fenrir scheme splice needs updating." >&2
+            exit 1
+        fi
+        cp -r "$src_dir/assets/schemes/fenrir" "$build_root/fenrir-scheme"
+        sed -i '/python -m installer --destdir/a\    cp -r "$startdir/fenrir-scheme" "$pkgdir"/usr/lib/python*/site-packages/caelestia/data/schemes/fenrir' \
+            "$build_root/PKGBUILD"
+    fi
+
     if [[ "$pkg" == "caelestia-shell" ]]; then
         # CachyOS's quickshell-git is a stale snapshot predating "DefaultEnv"
         # pragma support that shell.qml requires; build against quickshell instead.
