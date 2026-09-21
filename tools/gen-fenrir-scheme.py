@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Generates Fenrir's own Caelestia colour scheme.
 
-Seed is the warm amber/copper that matches the default wallpaper and the
-README badge; "content" keeps the background near-neutral instead of the
-muddy brown "vibrant" produces. Rerun after changing SEED or VARIANT.
+Mirrors what the dynamic scheme produces from the default wallpaper, but
+fixed and in dark mode: the seed is that wallpaper's dominant tone and the
+variant is the same "vibrant" dynamic uses, which keeps the deep red-browns
+rather than neutralising them. Rerun after changing SEED or VARIANT.
 """
 
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-SEED = "c8873f"
-VARIANT = "content"
+SEED = "906048"
+VARIANT = "vibrant"
 OUT = Path(__file__).resolve().parent.parent / "assets/schemes/fenrir/default"
 
 sys.path.insert(0, "/usr/lib/python3.14/site-packages")
