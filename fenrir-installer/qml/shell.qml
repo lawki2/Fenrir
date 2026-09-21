@@ -5,6 +5,8 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import Caelestia.Config
+import qs.components
+import qs.components.controls
 import qs.services
 // Quickshell's scanner only registers qs.* modules reached by a static import
 // from the root config, so a Loader-loaded page cannot pull in a new one.
@@ -34,12 +36,14 @@ PanelWindow {
 
     readonly property var pageOrder: [
         "welcome",
-        "tour-launcher", "tour-close", "tour-float", "tour-move", "tour-workspaces",
         "locale", "keyboard", "partition", "users", "progress",
     ]
     property int pageIndex: 0
+    property string pickerFilter: ""
+
+    readonly property var pickerOptions: root.pickerFilter.length > 0 ? Picker.options.filter(o => String(o).toLowerCase().includes(root.pickerFilter)) : Picker.options
     readonly property string currentPage: pageOrder[pageIndex]
-    readonly property bool showHeader: currentPage !== "welcome" && !currentPage.startsWith("tour") && currentPage !== "progress"
+    readonly property bool showHeader: currentPage !== "welcome" && currentPage !== "progress"
 
     // Collected as the user moves forward through the pages, sent to
     // cli.py's install command as JSON once they hit Install.
@@ -72,47 +76,12 @@ PanelWindow {
         anchors.margins: TokenConfig.appearance.spacing.large
         spacing: TokenConfig.appearance.spacing.medium
 
-        RowLayout {
-            Layout.fillWidth: true
-            visible: root.showHeader
-
-            Text {
-                text: "Install Fenrir"
-                color: Colours.m3onSurface
-                font.family: Fonts.sans
-                font.pointSize: TokenConfig.appearance.fontSize.large
-                font.bold: true
-                Layout.fillWidth: true
-            }
-
-            NavButton {
-                text: "Back"
-                // Nothing before "locale" should offer Back — welcome and
-                // every tour step have their own dedicated buttons instead,
-                // and their pages are hidden via showHeader anyway.
-                visible: root.pageIndex > root.pageOrder.indexOf("locale")
-                onClicked: root.pageIndex -= 1
-            }
-
-            NavButton {
-                id: nextButton
-                text: root.currentPage === "users" ? "Install" : "Next"
-                accent: true
-                onClicked: root.advance()
-            }
-        }
-
         Loader {
             id: pageLoader
             Layout.fillWidth: true
             Layout.fillHeight: true
             source: `pages/${{
                 welcome: "WelcomePage",
-                "tour-launcher": "TourLauncher",
-                "tour-close": "TourClose",
-                "tour-float": "TourFloat",
-                "tour-move": "TourMove",
-                "tour-workspaces": "TourWorkspaces",
                 locale: "LocalePage",
                 keyboard: "KeyboardPage",
                 partition: "PartitionPage",
@@ -179,12 +148,63 @@ PanelWindow {
                     root.pageIndex = root.pageOrder.indexOf("locale");
                 }
 
-                function onTour(): void {
-                    root.pageIndex += 1;
-                }
-
                 function onNext(): void {
                     root.pageIndex += 1;
+                }
+            }
+        }
+
+        // Each page carries its own title now, so the chrome is just the two
+        // buttons, sitting where a wizard expects them.
+        RowLayout {
+            Layout.fillWidth: true
+            visible: root.showHeader
+            spacing: Tokens.spacing.small
+
+            ButtonBase {
+                id: backButton
+
+                visible: root.pageIndex > root.pageOrder.indexOf("locale")
+                shapeMorph: true
+                isRound: true
+                type: ButtonBase.Text
+                inactiveOnColour: Colours.palette.m3onSurfaceVariant
+                implicitWidth: backLabel.implicitWidth + Tokens.padding.large * 2
+                implicitHeight: backLabel.implicitHeight + Tokens.padding.medium * 2
+                onClicked: root.pageIndex -= 1
+
+                StyledText {
+                    id: backLabel
+
+                    anchors.centerIn: parent
+                    text: qsTr("Back")
+                    color: backButton.onColour
+                    font: Tokens.font.body.small
+                }
+            }
+
+            Item {
+                Layout.fillWidth: true
+            }
+
+            ButtonBase {
+                id: nextButton
+
+                shapeMorph: true
+                isRound: true
+                inactiveColour: Colours.palette.m3primary
+                inactiveOnColour: Colours.palette.m3onPrimary
+                implicitWidth: nextLabel.implicitWidth + Tokens.padding.extraLarge * 2
+                implicitHeight: nextLabel.implicitHeight + Tokens.padding.medium * 2
+                onClicked: root.advance()
+
+                StyledText {
+                    id: nextLabel
+
+                    anchors.centerIn: parent
+                    text: root.currentPage === "users" ? qsTr("Install") : qsTr("Next")
+                    color: nextButton.onColour
+                    font: Tokens.font.body.small
                 }
             }
         }
@@ -203,6 +223,11 @@ PanelWindow {
         // (Behavior on offsetScale in modules/launcher/Wrapper.qml), just
         // without their directional slide-offset since this is a full
         // in-place content swap, not an edge-anchored drawer.
+        onVisibleChanged: if (!visible) {
+            root.pickerFilter = "";
+            pickerSearch.value = "";
+        }
+
         opacity: Picker.visible ? 1 : 0
         scale: Picker.visible ? 1 : 0.96
         visible: opacity > 0
@@ -222,60 +247,91 @@ PanelWindow {
 
             RowLayout {
                 Layout.fillWidth: true
+                spacing: Tokens.spacing.small
 
-                NavButton {
-                    text: "Back"
+                ButtonBase {
+                    id: pickerBack
+
+                    shapeMorph: true
+                    isRound: true
+                    type: ButtonBase.Text
+                    inactiveOnColour: Colours.palette.m3onSurfaceVariant
+                    implicitWidth: pickerBackLabel.implicitWidth + Tokens.padding.large * 2
+                    implicitHeight: pickerBackLabel.implicitHeight + Tokens.padding.medium * 2
                     onClicked: Picker.close()
+
+                    StyledText {
+                        id: pickerBackLabel
+
+                        anchors.centerIn: parent
+                        text: qsTr("Back")
+                        color: pickerBack.onColour
+                        font: Tokens.font.body.small
+                    }
                 }
 
-                Text {
+                StyledText {
                     Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
                     text: Picker.title
-                    color: Colours.m3onSurface
-                    font.family: Fonts.sans
-                    font.pointSize: TokenConfig.appearance.fontSize.large
-                    font.bold: true
+                    font: Tokens.font.title.large
+                    elide: Text.ElideRight
                 }
-
-                Item { Layout.preferredWidth: 68 }
             }
 
-            ListView {
+            // Hundreds of timezones and locales are unusable without this.
+            TextFieldRow {
+                id: pickerSearch
+
+                first: true
+                last: true
+                label: qsTr("Search")
+                placeholderText: Picker.title
+                onValueEdited: value => root.pickerFilter = value.trim().toLowerCase()
+            }
+
+            ItemList {
                 id: pickerList
+
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                clip: true
-                spacing: TokenConfig.appearance.spacing.small
-                model: Picker.options
-                ScrollBar.vertical: ScrollBar {}
+                first: true
+                last: true
+                showList: root.pickerOptions.length > 0
+                placeholderIcon: "search_off"
+                placeholderText: qsTr("Nothing matches")
 
-                delegate: Rectangle {
-                    id: optionDelegate
-                    required property string modelData
+                model: ScriptModel {
+                    values: root.pickerOptions
+                }
 
-                    width: pickerList.width
-                    height: 48
-                    radius: TokenConfig.appearance.rounding.small
-                    color: optionDelegate.modelData === Picker.selected ? Colours.m3primary : Colours.m3surfaceContainerHigh
+                delegate: Item {
+                    id: optionRow
 
-                    Text {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.leftMargin: TokenConfig.appearance.padding.large
-                        anchors.rightMargin: TokenConfig.appearance.padding.large
-                        anchors.verticalCenter: parent.verticalCenter
-                        elide: Text.ElideRight
-                        text: optionDelegate.modelData
-                        color: optionDelegate.modelData === Picker.selected ? Colours.m3onPrimary : Colours.m3onSurface
-                        font.family: Fonts.sans
-                        font.pointSize: TokenConfig.appearance.fontSize.normal
-                    }
+                    required property var modelData
+                    required property int index
+
+                    readonly property bool selected: optionRow.modelData === Picker.selected
+
+                    anchors.left: pickerList.list.contentItem.left
+                    anchors.right: pickerList.list.contentItem.right
+                    implicitHeight: optionLabel.implicitHeight + Tokens.padding.medium * 2
 
                     StateLayer {
-                        visible: optionDelegate.modelData !== Picker.selected
-                        radius: parent.radius
-                        onClicked: Picker.pick(optionDelegate.modelData)
+                        onClicked: Picker.pick(optionRow.modelData)
+                    }
+
+                    StyledText {
+                        id: optionLabel
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: Tokens.padding.largeIncreased
+                        anchors.rightMargin: Tokens.padding.largeIncreased
+                        text: optionRow.modelData
+                        color: optionRow.selected ? Colours.palette.m3primary : Colours.palette.m3onSurface
+                        font: Tokens.font.body.small
+                        elide: Text.ElideRight
                     }
                 }
             }

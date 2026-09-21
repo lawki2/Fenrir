@@ -1,11 +1,18 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
 import Caelestia.Config
-import "../"
+import qs.services
+import qs.modules.nexus.common
+import qs.common
 
-Item {
+InstallerPage {
     id: root
+
+    title: qsTr("Region and language")
+    subtitle: qsTr("Used for your clock, date format and the language the system is displayed in.")
 
     property string selectedTimezone: root.defaultTimezone
     property string selectedLocale: root.defaultLocale
@@ -14,37 +21,50 @@ Item {
     readonly property string defaultLocale: "en_US.UTF-8"
 
     ColumnLayout {
-        anchors.fill: parent
-        spacing: TokenConfig.appearance.spacing.small
+        width: root.cappedWidth
+        spacing: Tokens.spacing.extraSmall / 2
 
-        SectionHeading {
-            Layout.topMargin: TokenConfig.appearance.spacing.large
-            Layout.bottomMargin: TokenConfig.appearance.spacing.large
-            icon: "translate"
-            text: "Timezone and system language"
+        Process {
+            id: timezoneProc
+            command: ["timedatectl", "list-timezones"]
+            property var lines: []
+            property bool exited: false
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    timezoneProc.lines = text.split("\n").filter(l => l.length > 0);
+                    timezoneProc.exited = true;
+                }
+            }
+            Component.onCompleted: running = true
         }
 
-        SelectField {
-            label: "Timezone"
-            value: root.selectedTimezone
-            options: timezoneProc.exited ? timezoneProc.lines : [root.defaultTimezone]
-            Layout.fillWidth: true
+        FileView {
+            id: localeFile
+            path: "/etc/locale.gen"
+            property bool loaded: false
+            onLoaded: loaded = true
+        }
+
+        SectionHeader {
             first: true
-            last: false
-            onPicked: value => root.selectedTimezone = value
+            text: qsTr("Region")
         }
 
-        SelectField {
-            label: "Language"
-            value: root.selectedLocale
-            options: localeFile.loaded ? root.parseLocales(localeFile.text()) : [root.defaultLocale]
-            Layout.fillWidth: true
-            first: false
+        NavRow {
+            first: true
+            icon: "schedule"
+            text: qsTr("Time zone")
+            subtext: root.selectedTimezone
+            onClicked: Picker.open(qsTr("Time zone"), timezoneProc.exited ? timezoneProc.lines : [root.defaultTimezone], root.selectedTimezone, value => root.selectedTimezone = value)
+        }
+
+        NavRow {
             last: true
-            onPicked: value => root.selectedLocale = value
+            icon: "translate"
+            text: qsTr("Language")
+            subtext: root.selectedLocale
+            onClicked: Picker.open(qsTr("Language"), localeFile.loaded ? root.parseLocales(localeFile.text()) : [root.defaultLocale], root.selectedLocale, value => root.selectedLocale = value)
         }
-
-        Item { Layout.fillHeight: true }
     }
 
     function parseLocales(text: string): var {
@@ -57,24 +77,4 @@ Item {
         return locales.length > 0 ? locales : [root.defaultLocale];
     }
 
-    Process {
-        id: timezoneProc
-        command: ["timedatectl", "list-timezones"]
-        property var lines: []
-        property bool exited: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                timezoneProc.lines = text.split("\n").filter(l => l.length > 0);
-                timezoneProc.exited = true;
-            }
-        }
-        Component.onCompleted: running = true
-    }
-
-    FileView {
-        id: localeFile
-        path: "/etc/locale.gen"
-        property bool loaded: false
-        onLoaded: loaded = true
-    }
 }

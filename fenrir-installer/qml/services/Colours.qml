@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Caelestia.Config
 
 // Reads Caelestia's live scheme the same way its own shell does, and exposes
 // the same API surface (palette/tPalette/layer/light) so Caelestia's real
@@ -137,7 +138,17 @@ Singleton {
 
     readonly property Palette palette: Palette {}
     readonly property TPalette tPalette: TPalette {}
+    // Read from Tokens, the same source Caelestia's own Colours uses, so the
+    // installer is exactly as transparent as the desktop - no invented alpha.
+    // Config.appearance would warn here: it is screen-scoped and a singleton
+    // has no screen. The light-mode nudge mirrors Caelestia's Transparency.
     readonly property Transparency transparency: Transparency {}
+
+    component Transparency: QtObject {
+        readonly property bool enabled: Tokens.transparency.enabled
+        readonly property real base: Math.max(0, Math.min(1, Tokens.transparency.base - (root.light ? 0.1 : 0)))
+        readonly property real layers: Math.max(0, Math.min(1, Tokens.transparency.layers))
+    }
 
     // Caelestia's components tint themselves through this; returning the
     // colour unchanged when transparency is off matches its behaviour.
@@ -277,12 +288,6 @@ Singleton {
         readonly property color m3surfaceContainerHighest: root.layer(root.palette.m3surfaceContainerHighest)
         readonly property color m3surfaceContainerLow: root.layer(root.palette.m3surfaceContainerLow)
         readonly property color m3background: root.layer(root.palette.m3background, 0)
-    }
-
-    component Transparency: QtObject {
-        property bool enabled: true
-        property real base: 0.78
-        property real layers: 0.58
     }
 
     function load(data: string): void {

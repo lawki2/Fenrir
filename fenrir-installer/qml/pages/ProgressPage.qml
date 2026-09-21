@@ -1,20 +1,13 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
 import Caelestia.Config
-import "../"
+import qs.components
 import qs.services
+import qs.modules.nexus.common
 
-// Was a raw scrolling monospace log of cli.py's stdout - replaced with a
-// discrete named-step list (backend.py already emits a fixed, ordered
-// sequence of human-readable progress messages, see the stepTriggers
-// list below, one per real phase of the install) plus a collapsible
-// "Show details" log underneath for anyone who wants to see the raw
-// output, auto-expanded on failure. Parallel string arrays (labels +
-// trigger prefixes), matched by index via a plain loop - deliberately
-// avoids storing functions in a list<var>, unconfirmed safe in this QML
-// engine (see fenrir_installer_status.md's spread-syntax gotcha for why
-// this codebase treats "unconfirmed JS feature" with real caution).
 Item {
     id: root
 
@@ -58,18 +51,19 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: TokenConfig.appearance.spacing.large
+        spacing: Tokens.spacing.large
 
-        Text {
-            Layout.topMargin: TokenConfig.appearance.spacing.large
+        StyledText {
+            Layout.fillWidth: true
             text: root.statusText
-            color: root.failed ? Colours.m3error : Colours.m3onSurface
-            font.family: Fonts.sans
-            font.pointSize: TokenConfig.appearance.fontSize.large
+            color: root.failed ? Colours.palette.m3error : Colours.palette.m3onSurface
+            font: Tokens.font.title.large
+            wrapMode: Text.WordWrap
         }
 
         ColumnLayout {
-            spacing: TokenConfig.appearance.spacing.medium
+            Layout.fillWidth: true
+            spacing: Tokens.spacing.medium
 
             Repeater {
                 model: root.stepLabels
@@ -84,106 +78,88 @@ Item {
                     readonly property bool active: !root.failed && stepRow.index === root.currentStep
 
                     Layout.fillWidth: true
-                    spacing: TokenConfig.appearance.spacing.medium
+                    spacing: Tokens.spacing.medium
 
-                    Icon {
-                        text: stepRow.done ? "check_circle" : (stepRow.active ? "radio_button_checked" : "radio_button_unchecked")
-                        color: stepRow.done ? Colours.m3primary : (stepRow.active ? Colours.m3primary : Colours.m3outline)
-                        font.pixelSize: 20
-
+                    MaterialIcon {
+                        text: stepRow.done ? "check_circle" : stepRow.active ? "radio_button_checked" : "radio_button_unchecked"
+                        color: stepRow.done || stepRow.active ? Colours.palette.m3primary : Colours.palette.m3outline
+                        fontStyle: Tokens.font.icon.small
                         opacity: stepRow.active ? pulseAnim.value : 1
 
                         SequentialAnimation {
                             id: pulseAnim
+
                             property real value: 1
+
                             running: stepRow.active
                             loops: Animation.Infinite
 
-                            NumberAnimation { target: pulseAnim; property: "value"; from: 1; to: 0.35; duration: 700 }
-                            NumberAnimation { target: pulseAnim; property: "value"; from: 0.35; to: 1; duration: 700 }
+                            NumberAnimation {
+                                target: pulseAnim
+                                property: "value"
+                                from: 1
+                                to: 0.35
+                                duration: Tokens.anim.durations.large
+                            }
+
+                            NumberAnimation {
+                                target: pulseAnim
+                                property: "value"
+                                from: 0.35
+                                to: 1
+                                duration: Tokens.anim.durations.large
+                            }
                         }
                     }
 
-                    Text {
+                    StyledText {
+                        Layout.fillWidth: true
                         text: stepRow.modelData
-                        color: stepRow.done || stepRow.active ? Colours.m3onSurface : Colours.m3outline
-                        font.family: Fonts.sans
-                        font.pointSize: TokenConfig.appearance.fontSize.normal
+                        color: stepRow.done || stepRow.active ? Colours.palette.m3onSurface : Colours.palette.m3outline
+                        font: Tokens.font.body.medium
                     }
                 }
             }
         }
 
-        RowLayout {
-            spacing: TokenConfig.appearance.spacing.small
-
-            StateLayer {
-                implicitWidth: detailsRow.implicitWidth + TokenConfig.appearance.padding.small * 2
-                implicitHeight: detailsRow.implicitHeight + TokenConfig.appearance.padding.small * 2
-                radius: TokenConfig.appearance.rounding.small
-                onClicked: root.detailsVisible = !root.detailsVisible
-
-                RowLayout {
-                    id: detailsRow
-                    anchors.centerIn: parent
-                    spacing: TokenConfig.appearance.spacing.small
-
-                    Icon {
-                        text: root.detailsVisible ? "expand_less" : "expand_more"
-                        font.pixelSize: 16
-                        color: Colours.m3outline
-                    }
-
-                    Text {
-                        text: root.detailsVisible ? "Hide details" : "Show details"
-                        color: Colours.m3outline
-                        font.family: Fonts.sans
-                        font.pointSize: TokenConfig.appearance.fontSize.small
-                    }
-                }
-            }
+        // Layout.alignment rather than anchors: this sits inside a layout,
+        // and anchoring a layout-managed item is undefined behaviour.
+        RowButton {
+            Layout.fillWidth: true
+            first: true
+            last: true
+            icon: root.detailsVisible ? "expand_less" : "expand_more"
+            text: root.detailsVisible ? qsTr("Hide details") : qsTr("Show details")
+            onClicked: root.detailsVisible = !root.detailsVisible
         }
 
-        Rectangle {
+        ConnectedRect {
             visible: root.detailsVisible
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: TokenConfig.appearance.rounding.small
-            color: Colours.m3surfaceContainerLow
+            first: true
+            last: true
 
             Flickable {
                 id: flick
+
                 anchors.fill: parent
-                anchors.margins: TokenConfig.appearance.padding.large
+                anchors.margins: Tokens.padding.large
                 contentWidth: width
                 contentHeight: logText.implicitHeight
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
 
-                Text {
+                StyledText {
                     id: logText
+
                     width: flick.width
                     wrapMode: Text.Wrap
-                    color: Colours.m3onSurface
-                    font.family: Fonts.mono
-                    font.pointSize: TokenConfig.appearance.fontSize.small
+                    color: Colours.palette.m3onSurface
+                    font: Tokens.font.mono.small
                 }
 
                 onContentHeightChanged: flick.contentY = Math.max(0, contentHeight - height)
-            }
-        }
-    }
-
-    // Appending every line straight to logText.text forces a full text
-    // relayout each time; buffer and flush a few times a second instead.
-    Timer {
-        interval: 150
-        repeat: true
-        running: installProc.running
-        onTriggered: {
-            if (root.pendingLog.length > 0) {
-                logText.text += root.pendingLog;
-                root.pendingLog = "";
             }
         }
     }

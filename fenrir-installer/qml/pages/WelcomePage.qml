@@ -1,54 +1,61 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
-import "../"
+import qs.components
+import qs.components.controls
 import qs.services
 
+// No tour here any more: teaching a tiling WM while someone is trying to get
+// through an installer is the wrong moment. That content moved to
+// fenrir-tour/, to become the first-boot tutorial.
 Item {
     id: root
 
-    signal tour()
-    signal skip()
+    signal skip
 
     ColumnLayout {
         anchors.centerIn: parent
-        width: parent.width * 0.75
-        spacing: TokenConfig.appearance.spacing.large
+        width: Math.min(Tokens.sizes.nexus.maxContentWidth, parent.width)
+        spacing: Tokens.spacing.large
 
-        Text {
+        StyledText {
             Layout.fillWidth: true
+            text: qsTr("Welcome to Fenrir")
+            font: Tokens.font.headline.large
             horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-            text: "Welcome to Fenrir"
-            color: Colours.m3onSurface
-            font.family: Fonts.sans
-            font.pointSize: TokenConfig.appearance.fontSize.extraLarge
-            font.bold: true
         }
 
-        Text {
+        StyledText {
             Layout.fillWidth: true
+            Layout.bottomMargin: Tokens.spacing.large
+            text: qsTr("A few questions and this machine is yours. Nothing is written to disk until you confirm.")
+            color: Colours.palette.m3outline
+            font: Tokens.font.body.large
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
-            text: "Fenrir uses a tiling window manager — windows arrange themselves instead of overlapping, and almost everything is a keybind rather than a menu. New to this? A minute-long tour covers what you need to get around."
-            color: Colours.m3outline
-            font.family: Fonts.sans
-            font.pointSize: TokenConfig.appearance.fontSize.normal
         }
 
-        RowLayout {
+        ButtonBase {
+            id: startButton
+
             Layout.alignment: Qt.AlignHCenter
-            spacing: TokenConfig.appearance.spacing.medium
+            shapeMorph: true
+            isRound: true
+            inactiveColour: Colours.palette.m3primary
+            inactiveOnColour: Colours.palette.m3onPrimary
+            implicitWidth: startLabel.implicitWidth + Tokens.padding.extraLarge * 2
+            implicitHeight: startLabel.implicitHeight + Tokens.padding.large * 2
+            onClicked: root.skip()
 
-            NavButton {
-                text: "Skip"
-                onClicked: root.skip()
-            }
+            StyledText {
+                id: startLabel
 
-            NavButton {
-                text: "Take the tour"
-                accent: true
-                onClicked: root.tour()
+                anchors.centerIn: parent
+                text: qsTr("Get started")
+                color: startButton.onColour
+                font: Tokens.font.body.large
             }
         }
     }
