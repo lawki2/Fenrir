@@ -44,6 +44,22 @@ package() {
   # a second copy that drifts. caelestia-shell is already a hard dependency.
   ln -s ../caelestia/components "$pkgdir/etc/xdg/quickshell/fenrir-installer/components"
 
+  # Same trick for the Nexus row components (SectionHeader, ToggleRow,
+  # TextFieldRow, ...) so the installer is laid out in the same design
+  # language as the settings app. PageBase is deliberately not used: it
+  # requires NexusState, so common/InstallerPage.qml replaces just that.
+  # NetworkList.qml reaches into qs.utils; without it the scanner warns and
+  # drops the import.
+  ln -s ../caelestia/utils "$pkgdir/etc/xdg/quickshell/fenrir-installer/utils"
+
+  install -d "$pkgdir/etc/xdg/quickshell/fenrir-installer/modules/nexus"
+  ln -s ../../../caelestia/modules/nexus/common \
+    "$pkgdir/etc/xdg/quickshell/fenrir-installer/modules/nexus/common"
+
+  for f in "$startdir"/qml/common/*.qml; do
+    install -Dm644 "$f" "$pkgdir/etc/xdg/quickshell/fenrir-installer/common/$(basename "$f")"
+  done
+
   install -Dm644 "$startdir/fenrir-installer.desktop" \
     "$pkgdir/usr/share/applications/fenrir-installer.desktop"
 }

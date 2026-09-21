@@ -6,6 +6,11 @@ import Quickshell
 import Quickshell.Wayland
 import Caelestia.Config
 import qs.services
+// Quickshell's scanner only registers qs.* modules reached by a static import
+// from the root config, so a Loader-loaded page cannot pull in a new one.
+// These two are imported here on the pages' behalf, not used directly.
+import qs.common
+import qs.modules.nexus.common
 
 // A layer-shell surface rather than a floating app window: an opaque toplevel
 // can never match the rest of the desktop, because Caelestia's own surfaces
