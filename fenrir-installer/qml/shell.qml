@@ -3,15 +3,29 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Wayland
 import Caelestia.Config
+import qs.services
 
-FloatingWindow {
+// A layer-shell surface rather than a floating app window: an opaque toplevel
+// can never match the rest of the desktop, because Caelestia's own surfaces
+// are transparent layers that Hyprland blurs behind. Full-screen and
+// transparent, with the actual UI in a centred translucent panel.
+PanelWindow {
     id: root
 
-    implicitWidth: 780
-    implicitHeight: 560
-    title: root.currentPage === "welcome" || root.currentPage.startsWith("tour") ? "Welcome to Fenrir" : "Install Fenrir"
-    color: Colours.m3surface
+    readonly property int panelWidth: 780
+    readonly property int panelHeight: 560
+
+    WlrLayershell.namespace: "fenrir-installer"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+
+    anchors.top: true
+    anchors.bottom: true
+    anchors.left: true
+    anchors.right: true
+    color: "transparent"
 
     readonly property var pageOrder: [
         "welcome",
@@ -35,6 +49,18 @@ FloatingWindow {
         username: "",
         password: ""
     })
+
+    Rectangle {
+        id: panel
+
+        anchors.centerIn: parent
+        implicitWidth: root.panelWidth
+        implicitHeight: root.panelHeight
+        radius: TokenConfig.appearance.rounding.large
+        // tPalette applies Colours.layer(), the same alpha Caelestia's own
+        // surfaces use, so Hyprland's blur shows through exactly as it does
+        // behind the shell.
+        color: Colours.tPalette.m3surface
 
     ColumnLayout {
         anchors.fill: parent
@@ -158,12 +184,13 @@ FloatingWindow {
             }
         }
     }
+    }
 
     Rectangle {
         id: pickerOverlay
         anchors.fill: parent
         z: 100
-        color: Colours.m3surface
+        color: Colours.tPalette.m3surface
 
         // Unlike the page Loader above, this overlay is a persistent item
         // (never destroyed/recreated), so it gets the full show *and* hide

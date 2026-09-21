@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
+import qs.services
 
 // Shared visual template for each tour step — pages/Tour*.qml files are
 // just this with stepTitle/body overridden, so they ARE a TourStepBase at

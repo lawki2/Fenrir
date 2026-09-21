@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
+import qs.services
 
 // Page-level heading: a real Material icon paired with a larger, prominent
 // title - replaces the small muted (Colours.m3outline) caption every page

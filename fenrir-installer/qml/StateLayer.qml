@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Shapes
 import Quickshell.Widgets
 import Caelestia.Config
+import qs.services
 
 // Ported from Caelestia's own components/StateLayer.qml (the real Material
 // ripple + hover/press state-layer behaviour every button/switch/row in

@@ -35,6 +35,14 @@ package() {
   for f in "$startdir"/qml/pages/*.qml; do
     install -Dm644 "$f" "$pkgdir/etc/xdg/quickshell/fenrir-installer/pages/$(basename "$f")"
   done
+  for f in "$startdir"/qml/services/*.qml; do
+    install -Dm644 "$f" "$pkgdir/etc/xdg/quickshell/fenrir-installer/services/$(basename "$f")"
+  done
+
+  # qs.* resolves against the shell config root, so symlinking Caelestia's
+  # component tree in makes `import qs.components` the real thing rather than
+  # a second copy that drifts. caelestia-shell is already a hard dependency.
+  ln -s ../caelestia/components "$pkgdir/etc/xdg/quickshell/fenrir-installer/components"
 
   install -Dm644 "$startdir/fenrir-installer.desktop" \
     "$pkgdir/usr/share/applications/fenrir-installer.desktop"

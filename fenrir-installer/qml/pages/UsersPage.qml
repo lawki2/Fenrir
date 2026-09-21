@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
 import "../"
+import qs.services
 
 Item {
     id: root

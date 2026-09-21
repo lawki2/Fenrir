@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Shapes
 import QtQuick.Templates
 import Caelestia.Config
+import qs.services
 
 // Ported from Caelestia's own components/controls/TextFieldBase.qml +
 // StyledTextField.qml's "Outlined" variant, merged into one file since

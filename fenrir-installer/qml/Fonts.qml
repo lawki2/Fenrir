@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.services
 
 // Reads the user's actual chosen fonts from Caelestia's own shell.json
 // (~/.config/caelestia/shell.json's appearance.font.family) — the same

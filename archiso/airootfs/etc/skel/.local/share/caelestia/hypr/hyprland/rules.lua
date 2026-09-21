@@ -134,6 +134,11 @@ hl.layer_rule({ match = { namespace = "selection" }, animation = "fade" })      
 hl.layer_rule({ match = { namespace = "wayfreeze" }, animation = "fade" })                  -- wayfreeze
 hl.layer_rule({ match = { namespace = "launcher" }, animation = "popin 80%", blur = true }) -- Fuzzel
 
+-- The installer is a layer surface like the shell's own, so it needs the
+-- same blur. It runs as root without Hyprland IPC, so unlike Caelestia it
+-- can't set this itself at runtime. ignore_alpha tracks Colours' base.
+hl.layer_rule({ match = { namespace = "fenrir-installer" }, blur = true, ignore_alpha = 0.75 })
+
 -- Shell
 hl.layer_rule({ match = { namespace = "caelestia-(border-exclusion|area-picker)" }, no_anim = true })
 hl.layer_rule({ match = { namespace = "caelestia-(drawers|background)" }, animation = "fade" })

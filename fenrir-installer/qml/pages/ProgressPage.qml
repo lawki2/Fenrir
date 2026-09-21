@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell.Io
 import Caelestia.Config
 import "../"
+import qs.services
 
 // Was a raw scrolling monospace log of cli.py's stdout - replaced with a
 // discrete named-step list (backend.py already emits a fixed, ordered

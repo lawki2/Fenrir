@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
+import qs.services
 
 // A card-styled row that opens a full-page Picker instead of an inline
 // dropdown, for options lists too long to browse comfortably in a popup

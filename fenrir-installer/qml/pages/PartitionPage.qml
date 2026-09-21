@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell.Io
 import Caelestia.Config
 import "../"
+import qs.services
 
 Item {
     id: root
