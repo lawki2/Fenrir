@@ -17,7 +17,7 @@ RowLayout {
     property string icon
     property string text
 
-    spacing: TokenConfig.appearance.spacing.normal
+    spacing: TokenConfig.appearance.spacing.medium
 
     Icon {
         text: root.icon

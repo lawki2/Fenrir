@@ -24,12 +24,12 @@ NumberAnimation {
         if (root.type === Anim.DefaultSpatial)
             return TokenConfig.appearance.animDurations.expressiveDefaultSpatial;
         if (root.type === Anim.SlowEffects)
-            return TokenConfig.appearance.animDurations.expressiveSlowEffects;
+            return TokenConfig.appearance.animDurations.expressiveSlowSpatial;
         return TokenConfig.appearance.animDurations.normal;
     }
 
     easing.type: Easing.BezierSpline
     easing.bezierCurve: root.type === Anim.DefaultSpatial
-        ? TokenConfig.appearance.curves.expressiveDefaultSpatial
+        ? TokenConfig.appearance.curves.emphasized
         : TokenConfig.appearance.curves.standard
 }

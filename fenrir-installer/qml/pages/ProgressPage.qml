@@ -69,7 +69,7 @@ Item {
         }
 
         ColumnLayout {
-            spacing: TokenConfig.appearance.spacing.normal
+            spacing: TokenConfig.appearance.spacing.medium
 
             Repeater {
                 model: root.stepLabels
@@ -84,7 +84,7 @@ Item {
                     readonly property bool active: !root.failed && stepRow.index === root.currentStep
 
                     Layout.fillWidth: true
-                    spacing: TokenConfig.appearance.spacing.normal
+                    spacing: TokenConfig.appearance.spacing.medium
 
                     Icon {
                         text: stepRow.done ? "check_circle" : (stepRow.active ? "radio_button_checked" : "radio_button_unchecked")

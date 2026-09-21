@@ -88,7 +88,7 @@ MouseArea {
         property: "circleRadius"
         to: root.endRadius
         type: Anim.SlowEffects
-        duration: TokenConfig.appearance.animDurations.expressiveSlowEffects * 2
+        duration: TokenConfig.appearance.animDurations.expressiveSlowSpatial * 2
     }
 
     Anim {
@@ -146,12 +146,12 @@ MouseArea {
                         color: Qt.alpha(base.color, 1)
                     }
                     GradientStop {
-                        position: Math.max(0.01, Math.min(0.99, 1 - 0.2 * root.endRadius / root.circleRadius))
+                        position: root.circleRadius > 0 ? Math.max(0.01, Math.min(0.99, 1 - 0.2 * root.endRadius / root.circleRadius)) : 0.01
                         color: Qt.alpha(base.color, 1)
                     }
                     GradientStop {
                         position: 1
-                        color: Qt.alpha(base.color, Math.max(0, Math.min(1, (root.circleRadius / root.endRadius - 0.9) / 0.1)))
+                        color: Qt.alpha(base.color, root.endRadius > 0 ? Math.max(0, Math.min(1, (root.circleRadius / root.endRadius - 0.9) / 0.1)) : 0)
                     }
                 }
 

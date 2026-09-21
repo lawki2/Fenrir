@@ -38,7 +38,7 @@ Item {
 
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            spacing: TokenConfig.appearance.spacing.normal
+            spacing: TokenConfig.appearance.spacing.medium
 
             NavButton {
                 text: "Skip"

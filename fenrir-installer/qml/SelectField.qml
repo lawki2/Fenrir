@@ -51,7 +51,7 @@ Rectangle {
         anchors.fill: parent
         anchors.leftMargin: TokenConfig.appearance.padding.large
         anchors.rightMargin: TokenConfig.appearance.padding.large
-        spacing: TokenConfig.appearance.spacing.normal
+        spacing: TokenConfig.appearance.spacing.medium
 
         Text {
             text: root.label

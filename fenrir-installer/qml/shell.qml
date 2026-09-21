@@ -65,7 +65,7 @@ PanelWindow {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: TokenConfig.appearance.spacing.large
-        spacing: TokenConfig.appearance.spacing.normal
+        spacing: TokenConfig.appearance.spacing.medium
 
         RowLayout {
             Layout.fillWidth: true
@@ -213,7 +213,7 @@ PanelWindow {
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: TokenConfig.appearance.spacing.large
-            spacing: TokenConfig.appearance.spacing.normal
+            spacing: TokenConfig.appearance.spacing.medium
 
             RowLayout {
                 Layout.fillWidth: true
