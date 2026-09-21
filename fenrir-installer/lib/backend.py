@@ -3,6 +3,7 @@ Runs as root already (launched via pkexec) — no escalation happens here.
 """
 
 import re
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass
@@ -173,6 +174,82 @@ def read_package_list():
         if name:
             packages.append(name)
     return packages
+
+
+# The overlay lowerdir: the squashfs exactly as built, without whatever the
+# live session has written since boot.
+LIVE_ROOTFS = Path("/run/archiso/airootfs")
+
+# Live-only state that must never reach an installed system.
+LIVE_ONLY_PATHS = (
+    "etc/fenrir-packages.x86_64",  # also what gates the installer's autostart
+    "etc/sddm.conf.d/autologin.conf",
+    "etc/mkinitcpio.conf.d/archiso.conf",  # archiso HOOKS; the target needs its own
+    "etc/polkit-1/rules.d/49-nopasswd_global.rules",  # blanket wheel rule
+    "etc/machine-id",  # must be unique per machine
+    "opt/fenrir-local-repo",  # ~130MB of packages, and [fenrir-local] goes with it
+)
+
+
+def clone_live_rootfs(progress):
+    """Copies the live system to disk instead of re-downloading every package."""
+    if not LIVE_ROOTFS.is_dir():
+        progress("Installing packages (no live root filesystem found)")
+        pacstrap_target(progress)
+        return
+
+    progress("Installing packages by copying the live system")
+    _stream(
+        ["rsync", "-aHAX", "--numeric-ids", "--info=progress2",
+         f"{LIVE_ROOTFS}/", f"{TARGET}/"],
+        progress,
+    )
+    _scrub_live_state(progress)
+
+
+def _remove_pacman_section(pacman_conf, section):
+    lines = pacman_conf.read_text().splitlines()
+    try:
+        start = lines.index(f"[{section}]")
+    except ValueError:
+        return
+    end = start + 1
+    while end < len(lines) and not lines[end].startswith("["):
+        end += 1
+    while end > start + 1 and not lines[end - 1].strip():
+        end -= 1  # keep the blank line that separated the next section
+    del lines[start:end]
+    pacman_conf.write_text("\n".join(lines) + "\n")
+
+
+def _scrub_live_state(progress):
+    progress("Removing live-session state")
+
+    for rel in LIVE_ONLY_PATHS:
+        path = TARGET / rel
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
+
+    # liveuser holds uid 1000, so leaving it would push the real account to
+    # 1001 and strand a passwordless-login ghost in wheel/autologin.
+    if (TARGET / "home/liveuser").exists():
+        _chroot(["userdel", "-r", "liveuser"], progress)
+
+    _remove_pacman_section(TARGET / "etc/pacman.conf", "fenrir-local")
+
+    # Regenerated on first boot; shared host keys across installs would be bad.
+    ssh_dir = TARGET / "etc/ssh"
+    if ssh_dir.is_dir():
+        for key in ssh_dir.glob("ssh_host_*"):
+            key.unlink(missing_ok=True)
+
+    for rel in ("var/cache/pacman/pkg", "var/lib/pacman/sync", "var/log/journal"):
+        path = TARGET / rel
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+            path.mkdir(parents=True, exist_ok=True)
 
 
 def pacstrap_target(progress):
@@ -545,7 +622,7 @@ def unmount_target(progress):
 def run_install(plan: InstallPlan, progress):
     partition_and_mount(plan.disk, plan.esp_mib, progress)
     progress("Installing packages (this takes a while)")
-    pacstrap_target(progress)
+    clone_live_rootfs(progress)
     configure_fenrir_repo(progress)
     configure_cachyos_repos(progress)
     copy_skel(progress)
