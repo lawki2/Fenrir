@@ -626,6 +626,29 @@ def configure_kernel_cmdline(root_part, progress):
     )
 
 
+BOOTLOADER_STAGE = "opt/fenrir-bootloader"
+
+
+def install_bootloader_packages(progress):
+    # limine is missing from the live image on purpose (see util-iso.sh), so
+    # the clone inherits that gap and limine-install would not exist. The
+    # package files ride along on the ISO instead; by now the target has a
+    # real ESP mounted, which is the thing their hooks need.
+    stage = TARGET / BOOTLOADER_STAGE
+    packages = sorted(stage.glob("*.pkg.tar.zst")) if stage.is_dir() else []
+    if not packages:
+        # The pacstrap fallback path installs limine from the package list.
+        progress("No staged bootloader packages, assuming limine is installed")
+        return
+
+    progress("Installing the bootloader")
+    _chroot(
+        ["pacman", "-U", "--noconfirm", *[f"/{BOOTLOADER_STAGE}/{p.name}" for p in packages]],
+        progress,
+    )
+    shutil.rmtree(stage, ignore_errors=True)
+
+
 def finalize_bootloader(progress):
     # Registers the initial NVRAM boot entry for this fresh install.
     progress("Installing Limine")
@@ -728,6 +751,7 @@ def run_install(plan: InstallPlan, progress):
     configure_plymouth(progress)
     _, root_part = _partition_paths(plan.disk)
     configure_kernel_cmdline(root_part, progress)
+    install_bootloader_packages(progress)
     finalize_bootloader(progress)
     enable_services(progress)
     configure_firewall(progress)
