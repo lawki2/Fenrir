@@ -2,11 +2,11 @@ pragma Singleton
 
 import QtQuick
 
-// Shared state for the full-page option picker (shell.qml renders the
-// actual overlay). SelectField.qml opens it; picking an option invokes the
-// stored callback and closes it. A singleton because SelectField instances
-// live inside per-page QML files loaded via Loader, which can't reach back
-// up to shell.qml's ids directly.
+// Shared state for the full-page option picker (shell.qml renders the actual
+// overlay). Options are {label, value} pairs so the list can show a readable
+// name while the page keeps the raw code. A singleton because the rows that
+// open it live inside per-page QML files loaded via Loader, which can't reach
+// back up to shell.qml's ids directly.
 QtObject {
     id: root
 
@@ -24,9 +24,9 @@ QtObject {
         root.visible = true;
     }
 
-    function pick(option: string): void {
+    function pick(option: var): void {
         if (root.callback)
-            root.callback(option);
+            root.callback(option.value);
         root.visible = false;
     }
 

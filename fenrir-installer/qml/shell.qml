@@ -45,7 +45,7 @@ FloatingWindow {
     property int pageIndex: 0
     property string pickerFilter: ""
 
-    readonly property var pickerOptions: root.pickerFilter.length > 0 ? Picker.options.filter(o => String(o).toLowerCase().includes(root.pickerFilter)) : Picker.options
+    readonly property var pickerOptions: root.pickerFilter.length > 0 ? Picker.options.filter(o => o.label.toLowerCase().includes(root.pickerFilter)) : Picker.options
     readonly property string currentPage: pageOrder[pageIndex]
     readonly property bool showHeader: currentPage !== "welcome" && currentPage !== "progress"
 
@@ -302,7 +302,7 @@ FloatingWindow {
                     required property var modelData
                     required property int index
 
-                    readonly property bool selected: optionRow.modelData === Picker.selected
+                    readonly property bool selected: optionRow.modelData.value === Picker.selected
 
                     anchors.left: pickerList.list.contentItem.left
                     anchors.right: pickerList.list.contentItem.right
@@ -320,7 +320,7 @@ FloatingWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.leftMargin: Tokens.padding.largeIncreased
                         anchors.rightMargin: Tokens.padding.largeIncreased
-                        text: optionRow.modelData
+                        text: optionRow.modelData.label
                         color: optionRow.selected ? Colours.palette.m3primary : Colours.palette.m3onSurface
                         font: Tokens.font.body.small
                         elide: Text.ElideRight
