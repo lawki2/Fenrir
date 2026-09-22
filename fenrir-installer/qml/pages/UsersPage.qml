@@ -69,6 +69,7 @@ InstallerPage {
 
             first: true
             label: qsTr("Full name")
+            placeholderText: "Full name"
             subtext: qsTr("Optional, shown on the login screen")
             errorText: root.errorVisible && !root.fullNameValid ? qsTr("Can't contain a colon") : ""
             onValueEdited: value => fullNameRow.value = value
@@ -87,6 +88,7 @@ InstallerPage {
             id: passwordRow
 
             label: qsTr("Password")
+            placeholderText: "Password"
             field.echoMode: TextInput.Password
             errorText: root.errorVisible && root.password.length === 0 ? qsTr("Required") : ""
             onValueEdited: value => passwordRow.value = value
@@ -97,6 +99,7 @@ InstallerPage {
 
             last: true
             label: qsTr("Confirm password")
+            placeholderText: "Confirm password"
             field.echoMode: TextInput.Password
             errorText: root.errorVisible && !root.passwordsMatch ? qsTr("Passwords don't match") : ""
             onValueEdited: value => confirmRow.value = value
