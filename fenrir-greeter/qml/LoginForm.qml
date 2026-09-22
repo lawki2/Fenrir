@@ -99,6 +99,9 @@ ColumnLayout {
 
         Layout.fillWidth: true
         Layout.topMargin: Tokens.spacing.small
+        // ButtonBase marks both implicit sizes required; Layout.fillWidth
+        // overrides the width but it still has to be set.
+        implicitWidth: signInLabel.implicitWidth + Tokens.padding.extraLarge * 2
         implicitHeight: signInLabel.implicitHeight + Tokens.padding.large * 2
         shapeMorph: true
         isRound: true
