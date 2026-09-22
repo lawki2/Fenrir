@@ -35,6 +35,22 @@ Item {
     property int currentStep: 0
     property string pendingLog: ""
 
+    // A long install emits far more than anyone scrolls back through, and
+    // Text relayout cost grows with the string, so keep the tail only.
+    readonly property int maxLogChars: 60000
+
+    function flushLog(): void {
+        if (root.pendingLog.length === 0)
+            return;
+        let merged = logText.text + root.pendingLog;
+        root.pendingLog = "";
+        if (merged.length > root.maxLogChars) {
+            const cut = merged.indexOf("\n", merged.length - root.maxLogChars);
+            merged = merged.slice(cut < 0 ? merged.length - root.maxLogChars : cut + 1);
+        }
+        logText.text = merged;
+    }
+
     function checkStep(line: string): void {
         for (let i = root.currentStep; i < root.stepTriggers.length; i++) {
             if (line.startsWith(root.stepTriggers[i])) {
@@ -164,6 +180,15 @@ Item {
         }
     }
 
+    // Appending every line straight to logText.text forces a full text
+    // relayout each time; buffer and flush a few times a second instead.
+    Timer {
+        interval: 150
+        repeat: true
+        running: installProc.running
+        onTriggered: root.flushLog()
+    }
+
     Process {
         id: installProc
         stdout: SplitParser {
@@ -173,10 +198,7 @@ Item {
             }
         }
         onExited: (exitCode, exitStatus) => {
-            if (root.pendingLog.length > 0) {
-                logText.text += root.pendingLog;
-                root.pendingLog = "";
-            }
+            root.flushLog();
             if (exitCode === 0) {
                 root.currentStep = root.stepLabels.length;
                 root.statusText = "Install complete. You can reboot now.";
