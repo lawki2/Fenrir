@@ -200,8 +200,9 @@ if [[ ! -d "$HOME/caelestia" ]]; then
 fi
 build_one "caelestia-meta" "$HOME/caelestia"
 
-# Fenrir's own package, not on AUR; its PKGBUILD lives in this repo.
+# Fenrir's own packages, not on AUR; their PKGBUILDs live in this repo.
 build_one "fenrir-installer" "$src_dir/fenrir-installer"
+build_one "fenrir-greeter" "$src_dir/fenrir-greeter"
 
 echo "==> Done. Built packages are in $repo_dir"
 ls -1 "$repo_dir"/*.pkg.tar.zst
