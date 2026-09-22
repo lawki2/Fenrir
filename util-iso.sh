@@ -144,10 +144,10 @@ prepare_profile(){
         # SYSLINUX/GRUB setup, not a pacstrapped Limine, so it doesn't need
         # them anyway.
         grep -vE '^(limine|limine-mkinitcpio-hook)$' ${src_dir}/archiso/packages_fenrir.x86_64 > ${src_dir}/archiso/packages.x86_64
-        # greetd, not sddm: the live session autologins via the [initial_session]
-        # in airootfs/etc/greetd/config.toml, and logging out drops to Fenrir's
-        # own greeter. sddm stays installed purely as a fallback.
-        ln -sf /usr/lib/systemd/system/greetd.service ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
+        # sddm, not greetd: the live image autologins straight into the desktop
+        # and never shows a login screen, so there is nothing for the greeter to
+        # do here. The installer switches the target to greetd instead.
+        ln -sf /usr/lib/systemd/system/sddm.service ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
         # fenrir-installer pacstraps the same package list the live image
         # itself was built from, so the installed system always matches
         # what's already been verified booting live. Baking a copy into

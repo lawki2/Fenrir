@@ -34,10 +34,9 @@ package() {
   ln -s ../caelestia/utils "$pkgdir/etc/xdg/quickshell/fenrir-greeter/utils"
 
   # Deliberately NOT installed to /etc/greetd/config.toml: greetd owns that
-  # path, and two packages shipping one file is a hard conflict pacman will
-  # not install through. greetd marks it backup=, so the live image's own copy
-  # in airootfs survives and greetd's default lands beside it as .pacnew. On a
-  # real install, backend.py's configure_greeter() copies this one into place.
+  # path, and two packages shipping one file is a hard conflict pacman will not
+  # install through. The live image never runs greetd anyway; backend.py's
+  # configure_greeter() copies this onto the target at install time.
   install -Dm644 "$startdir/config/config.toml" \
     "$pkgdir/usr/share/fenrir-greeter/config.toml"
   install -Dm644 "$startdir/config/hyprland.conf" "$pkgdir/etc/greetd/hyprland.conf"
