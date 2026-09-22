@@ -123,8 +123,8 @@ ShellRoot {
             LoginForm {
                 anchors.centerIn: parent
                 width: Math.min(parent.width - Tokens.padding.large * 2, 420)
-                // Only the focused screen gets the form; the rest just show
-                // the wallpaper, the way a multi-monitor greeter should.
+                // Only the first screen gets the form; the rest just show the
+                // wallpaper, so a multi-monitor setup has one place to type.
                 visible: win.modelData.name === Quickshell.screens[0].name
                 users: root.users
                 session: root.session

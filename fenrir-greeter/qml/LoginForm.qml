@@ -55,7 +55,7 @@ ColumnLayout {
     StyledText {
         Layout.alignment: Qt.AlignHCenter
         text: clock.time
-        font: Tokens.font.display.large
+        font: Tokens.font.headline.large
         color: Colours.palette.m3onSurface
     }
 
