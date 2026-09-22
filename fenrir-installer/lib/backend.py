@@ -202,6 +202,7 @@ LIVE_ONLY_PATHS = (
     "etc/mkinitcpio.conf.d/archiso.conf",  # archiso HOOKS; the target needs its own
     "etc/polkit-1/rules.d/49-nopasswd_global.rules",  # blanket wheel rule
     "etc/machine-id",  # must be unique per machine
+    "etc/pacman.d/gnupg",  # local signing key must be per-machine, like ssh host keys
     "opt/fenrir-local-repo",  # ~130MB of packages, and [fenrir-local] goes with it
 )
 
@@ -220,6 +221,17 @@ def clone_live_rootfs(progress):
         progress,
     )
     _scrub_live_state(progress)
+
+
+def initialize_keyring(progress):
+    # The clone comes from /run/archiso/airootfs, the read-only squashfs
+    # lowerdir - but the live keyring is built at boot by pacman-init.service
+    # into the overlay's upper layer, so the target inherits none at all and
+    # every pacman-key call fails its permission check. Idempotent, so it is
+    # safe on the pacstrap fallback path too.
+    progress("Initializing the pacman keyring")
+    _chroot(["pacman-key", "--init"], progress)
+    _chroot(["pacman-key", "--populate"], progress)
 
 
 def _remove_pacman_section(pacman_conf, section):
@@ -320,9 +332,8 @@ def configure_fenrir_repo(progress):
         ]
         pacman_conf.write_text("\n".join(lines) + "\n")
 
-    # pacstrap -K above already initialized a fresh keyring at
-    # etc/pacman.d/gnupg for this target, so pacman-key has something to
-    # add to.
+    # initialize_keyring() has already built a fresh keyring for the target,
+    # so pacman-key has something to add to.
     _chroot(["pacman-key", "--add", "/etc/pacman.d/fenrir-signing-key.asc"], progress)
     _chroot(["pacman-key", "--lsign-key", FENRIR_REPO_KEY_FPR], progress)
 
@@ -666,6 +677,7 @@ def run_install(plan: InstallPlan, progress):
     partition_and_mount(plan.disk, plan.esp_mib, progress)
     progress("Installing packages (this takes a while)")
     clone_live_rootfs(progress)
+    initialize_keyring(progress)
     configure_fenrir_repo(progress)
     configure_cachyos_repos(progress)
     copy_skel(progress)
