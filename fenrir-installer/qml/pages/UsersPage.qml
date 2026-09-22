@@ -78,7 +78,7 @@ InstallerPage {
             id: usernameRow
 
             label: qsTr("Username")
-            placeholderText: "loke"
+            placeholderText: "user"
             errorText: root.errorVisible && !root.usernameValid ? qsTr("Lowercase, starting with a letter or underscore") : ""
             onValueEdited: value => usernameRow.value = value
         }
