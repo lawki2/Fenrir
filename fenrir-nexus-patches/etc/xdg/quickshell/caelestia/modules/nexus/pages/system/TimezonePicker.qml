@@ -11,10 +11,11 @@ import qs.modules.nexus.common
 PageBase {
     id: root
 
-    property list<string> available: []
+    property var available: []
     property string filter: ""
 
-    readonly property list<string> shown: root.filter.length > 0 ? root.available.filter(tz => tz.toLowerCase().indexOf(root.filter) >= 0) : root.available
+    readonly property var options: FenrirNames.timezoneOptions(root.available)
+    readonly property var shown: root.filter.length > 0 ? root.options.filter(tz => tz.label.toLowerCase().indexOf(root.filter) >= 0) : root.options
 
     title: qsTr("Time zone")
     isSubPage: true
@@ -86,7 +87,7 @@ PageBase {
                 implicitHeight: itemRow.implicitHeight + Tokens.padding.medium * 2
 
                 StateLayer {
-                    onClicked: root.setTimezone(item.modelData)
+                    onClicked: root.setTimezone(item.modelData.value)
                 }
 
                 RowLayout {
@@ -98,7 +99,7 @@ PageBase {
 
                     StyledText {
                         Layout.fillWidth: true
-                        text: item.modelData
+                        text: item.modelData.label
                         font: Tokens.font.body.small
                     }
                 }

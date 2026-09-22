@@ -12,10 +12,11 @@ import qs.modules.nexus.common
 PageBase {
     id: root
 
-    property list<string> available: []
+    property var available: []
     property string filter: ""
 
-    readonly property list<string> shown: root.filter.length > 0 ? root.available.filter(l => l.indexOf(root.filter.toLowerCase()) >= 0) : root.available
+    readonly property var options: FenrirNames.layoutOptions(root.available)
+    readonly property var shown: root.filter.length > 0 ? root.options.filter(l => l.label.toLowerCase().indexOf(root.filter) >= 0) : root.options
 
     title: qsTr("Add layout")
     isSubPage: true
@@ -114,7 +115,7 @@ PageBase {
                 implicitHeight: itemRow.implicitHeight + Tokens.padding.medium * 2
 
                 StateLayer {
-                    onClicked: root.addLayout(item.modelData)
+                    onClicked: root.addLayout(item.modelData.value)
                 }
 
                 RowLayout {
@@ -126,7 +127,7 @@ PageBase {
 
                     StyledText {
                         Layout.fillWidth: true
-                        text: item.modelData
+                        text: item.modelData.label
                         font: Tokens.font.body.small
                     }
                 }

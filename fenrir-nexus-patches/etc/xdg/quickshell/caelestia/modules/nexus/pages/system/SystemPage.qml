@@ -168,7 +168,7 @@ PageBase {
 
                     StyledText {
                         Layout.fillWidth: true
-                        text: layoutItem.modelData
+                        text: FenrirNames.layoutLabel(layoutItem.modelData)
                         font: Tokens.font.body.small
                     }
 
@@ -232,7 +232,7 @@ PageBase {
         NavRow {
             icon: "schedule"
             text: qsTr("Time zone")
-            subtext: root.timezone
+            subtext: FenrirNames.timezoneLabel(root.timezone)
             onClicked: root.nState.openSubPage(2)
         }
 
