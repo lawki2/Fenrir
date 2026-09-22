@@ -456,6 +456,34 @@ def configure_keyboard(layout, progress):
     greeter_conf.write_text("input {\n    kb_layout = %s\n}\n" % layout)
 
 
+# The live image overlays /etc/greetd/config.toml with an autologin section
+# for liveuser; the package keeps an untouched copy here for the target.
+GREETER_PRISTINE_CONF = Path("/usr/share/fenrir-greeter/config.toml")
+
+
+def configure_greeter(progress):
+    # The clone copies the live config verbatim, autologin and all, which on a
+    # real machine would log anyone straight in as a user that no longer
+    # exists. Overwrite it rather than scrub it, so the target always ends up
+    # with a working greeter config.
+    target_conf = TARGET / "etc/greetd/config.toml"
+    if not GREETER_PRISTINE_CONF.exists():
+        progress("Skipping greeter config - fenrir-greeter is not installed")
+        return
+
+    progress("Configuring the login screen")
+    target_conf.parent.mkdir(parents=True, exist_ok=True)
+    target_conf.write_text(GREETER_PRISTINE_CONF.read_text())
+
+    # Point display-manager.service at greetd explicitly rather than trusting
+    # greetd.service to carry an Alias for it. sddm stays installed as the way
+    # back in: "systemctl enable --now sddm" from a TTY if the greeter fails.
+    dm = TARGET / "etc/systemd/system/display-manager.service"
+    dm.parent.mkdir(parents=True, exist_ok=True)
+    dm.unlink(missing_ok=True)
+    dm.symlink_to("/usr/lib/systemd/system/greetd.service")
+
+
 def configure_hostname(hostname, progress):
     progress(f"Setting hostname to {hostname}")
     (TARGET / "etc/hostname").write_text(f"{hostname}\n")
@@ -617,7 +645,7 @@ def finalize_bootloader(progress):
     limine_conf.write_text("\n".join(lines) + "\n")
 
 
-ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "sddm", "firewalld")
+ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "greetd", "firewalld")
 
 
 def enable_services(progress):
@@ -692,6 +720,7 @@ def run_install(plan: InstallPlan, progress):
     genfstab_target(progress)
     configure_locale(plan.timezone, plan.locale, progress)
     configure_keyboard(plan.keyboard, progress)
+    configure_greeter(progress)
     configure_hostname(plan.hostname, progress)
     create_user(plan.username, plan.full_name, plan.password, progress)
     configure_sudo(progress)
