@@ -220,8 +220,9 @@ qtengine
 app2unit
 caelestia-cli
 caelestia-shell
-# Login screen. Installed but NOT enabled: display-manager.service still
-# points at sddm, so greetd only takes over once that symlink is switched.
+# Login screen for installed systems. Present here only so the squashfs clone
+# carries it to the target; the live image autologins via sddm and never runs
+# it. backend.py's configure_greeter() is what switches the target to greetd.
 fenrir-greeter
 caelestia-meta
 python-materialyoucolor
