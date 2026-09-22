@@ -1,0 +1,40 @@
+# Maintainer: Fenrir
+pkgname=fenrir-greeter
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Fenrir's themed QML/Quickshell login screen for greetd"
+arch=('x86_64')
+license=('GPL-3.0-only')
+depends=(
+  'quickshell'
+  'caelestia-shell'
+  'greetd'
+  'hyprland'
+  'python'
+)
+source=()
+
+package() {
+  # The bridge is a helper, not something anyone runs by hand, so it stays out
+  # of PATH.
+  install -Dm755 "$startdir/bin/fenrir-greet-bridge" \
+    "$pkgdir/usr/lib/fenrir-greeter/fenrir-greet-bridge"
+
+  for f in "$startdir"/qml/*.qml; do
+    install -Dm644 "$f" "$pkgdir/etc/xdg/quickshell/fenrir-greeter/$(basename "$f")"
+  done
+  for f in "$startdir"/qml/services/*.qml; do
+    install -Dm644 "$f" "$pkgdir/etc/xdg/quickshell/fenrir-greeter/services/$(basename "$f")"
+  done
+
+  # Same trick the installer uses: qs.* resolves against the shell config root,
+  # so symlinking Caelestia's trees in makes `import qs.components` the real
+  # thing rather than a second copy that drifts.
+  ln -s ../caelestia/components "$pkgdir/etc/xdg/quickshell/fenrir-greeter/components"
+  ln -s ../caelestia/utils "$pkgdir/etc/xdg/quickshell/fenrir-greeter/utils"
+
+  install -Dm644 "$startdir/config/config.toml" "$pkgdir/etc/greetd/config.toml"
+  install -Dm644 "$startdir/config/hyprland.conf" "$pkgdir/etc/greetd/hyprland.conf"
+  install -Dm644 "$startdir/config/hyprland-layout.conf" \
+    "$pkgdir/etc/greetd/hyprland-layout.conf"
+}

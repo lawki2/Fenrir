@@ -1,0 +1,9 @@
+# greetd launches a throwaway Hyprland as the unprivileged "greeter" user,
+# which runs the Quickshell greeter and nothing else. Hyprland exits as soon
+# as the greeter does, handing the session back to greetd.
+[terminal]
+vt = 1
+
+[default_session]
+command = "Hyprland --config /etc/greetd/hyprland.conf"
+user = "greeter"
