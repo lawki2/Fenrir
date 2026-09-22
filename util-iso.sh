@@ -167,6 +167,24 @@ prepare_profile(){
         # archiso/pacman.conf which mkarchiso only uses for a temporary
         # build-time work config), so its [fenrir-local] entry points here
         # instead, at this baked-in copy.
+        # limine can't be installed into the live image: one of its pacman
+        # hooks deploys onto a mounted ESP that doesn't exist while mkarchiso
+        # builds a squashfs, and limine-mkinitcpio-hook ships an
+        # /etc/pacman.d/hooks override that replaces the kernel's own
+        # initramfs hook. Since the offline install clones the live image
+        # rather than pacstrapping, the target would inherit that gap and
+        # limine-install would not exist - so stage the package files here and
+        # let backend.py install them once a real ESP is mounted.
+        stage=${src_dir}/archiso/airootfs/opt/fenrir-bootloader
+        rm -rf ${stage}
+        mkdir -p ${stage}
+        for url in $(pacman -Sp --print-format '%l' limine limine-mkinitcpio-hook); do
+            case "$url" in
+                file://*) cp "${url#file://}" "${stage}/" ;;
+                *) curl -fL --retry 3 -o "${stage}/$(basename "$url")" "$url" ;;
+            esac
+        done
+
         rm -rf ${src_dir}/archiso/airootfs/opt/fenrir-local-repo
         mkdir -p ${src_dir}/archiso/airootfs/opt/fenrir-local-repo
         cp ${src_dir}/local-repo/*.pkg.tar.zst ${src_dir}/archiso/airootfs/opt/fenrir-local-repo/
