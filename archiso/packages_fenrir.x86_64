@@ -208,6 +208,13 @@ shelly
 # which the Nexus firewall page talks to directly.
 firewalld
 
+# Language, country, layout and timezone names for the installer and the
+# Nexus system page, via modules/nexus/common/FenrirNames.qml. Pulled in as
+# dependencies today, listed here because they are now a hard requirement.
+iso-codes
+xkeyboard-config
+tzdata
+
 # AUR built packages, see build-local-repo.sh and local-repo.
 qtengine
 app2unit
