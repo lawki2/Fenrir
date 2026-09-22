@@ -34,6 +34,10 @@ package() {
   ln -s ../caelestia/utils "$pkgdir/etc/xdg/quickshell/fenrir-greeter/utils"
 
   install -Dm644 "$startdir/config/config.toml" "$pkgdir/etc/greetd/config.toml"
+  # The live ISO overlays its own /etc/greetd/config.toml with an autologin
+  # section, so the installer needs an untouched copy to put on the target.
+  install -Dm644 "$startdir/config/config.toml" \
+    "$pkgdir/usr/share/fenrir-greeter/config.toml"
   install -Dm644 "$startdir/config/hyprland.conf" "$pkgdir/etc/greetd/hyprland.conf"
   install -Dm644 "$startdir/config/hyprland-layout.conf" \
     "$pkgdir/etc/greetd/hyprland-layout.conf"
