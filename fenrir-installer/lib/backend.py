@@ -381,6 +381,7 @@ def configure_locale(timezone, locale, progress):
 
 
 KBD_MODEL_MAP = Path("/usr/share/systemd/kbd-model-map")
+SKEL_HYPR_VARS = "etc/skel/.config/caelestia/hypr-vars.lua"
 
 
 def _console_keymap(layout):
@@ -413,6 +414,12 @@ def configure_keyboard(layout, progress):
         f'    Option "XkbLayout" "{layout}"\n'
         "EndSection\n"
     )
+
+    # Hyprland ignores xorg.conf.d, so without this the desktop stays on "us".
+    # Written into skel because create_user's useradd -m copies it from there.
+    hypr_vars = TARGET / SKEL_HYPR_VARS
+    hypr_vars.parent.mkdir(parents=True, exist_ok=True)
+    hypr_vars.write_text('return {\n    kbLayout = "%s",\n}\n' % layout)
 
 
 def configure_hostname(hostname, progress):
