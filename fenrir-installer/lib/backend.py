@@ -408,6 +408,7 @@ def configure_locale(timezone, locale, progress):
 
 KBD_MODEL_MAP = Path("/usr/share/systemd/kbd-model-map")
 SKEL_HYPR_VARS = "etc/skel/.config/caelestia/hypr-vars.lua"
+GREETER_LAYOUT_CONF = "etc/greetd/hyprland-layout.conf"
 
 
 def _console_keymap(layout):
@@ -446,6 +447,13 @@ def configure_keyboard(layout, progress):
     hypr_vars = TARGET / SKEL_HYPR_VARS
     hypr_vars.parent.mkdir(parents=True, exist_ok=True)
     hypr_vars.write_text('return {\n    kbLayout = "%s",\n}\n' % layout)
+
+    # The greeter is a separate user running its own bare Hyprland, so it
+    # needs the layout independently - otherwise the login screen is always
+    # us and anyone else mistypes their password with no clue why.
+    greeter_conf = TARGET / GREETER_LAYOUT_CONF
+    greeter_conf.parent.mkdir(parents=True, exist_ok=True)
+    greeter_conf.write_text("input {\n    kb_layout = %s\n}\n" % layout)
 
 
 def configure_hostname(hostname, progress):
