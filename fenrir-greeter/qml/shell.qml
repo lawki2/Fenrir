@@ -46,11 +46,7 @@ ShellRoot {
 
     FileView {
         path: "/etc/passwd"
-        onLoaded: {
-            root.users = root.parsePasswd(text());
-            if (root.users.length > 0)
-                Greetd.username = root.users[0].name;
-        }
+        onLoaded: root.users = root.parsePasswd(text())
     }
 
     // One line per session: display name, tab, Exec command.
@@ -122,7 +118,8 @@ ShellRoot {
 
             LoginForm {
                 anchors.centerIn: parent
-                width: Math.min(parent.width - Tokens.padding.large * 2, 420)
+                // Scales like the lock screen does, off the screen's height.
+                screenHeight: win.modelData.height
                 // Only the first screen gets the form; the rest just show the
                 // wallpaper, so a multi-monitor setup has one place to type.
                 visible: win.modelData.name === Quickshell.screens[0].name

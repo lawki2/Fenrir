@@ -1,7 +1,7 @@
 # Maintainer: Fenrir
 pkgname=fenrir-greeter
 pkgver=1.0.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Fenrir's themed QML/Quickshell login screen for greetd"
 arch=('x86_64')
 license=('GPL-3.0-only')
@@ -32,6 +32,21 @@ package() {
   # thing rather than a second copy that drifts.
   ln -s ../caelestia/components "$pkgdir/etc/xdg/quickshell/fenrir-greeter/components"
   ln -s ../caelestia/utils "$pkgdir/etc/xdg/quickshell/fenrir-greeter/utils"
+
+  # The greeter is meant to read as the AFK lock screen, so it imports that
+  # module's Clock and ProfilePic rather than reimplementing them. Its
+  # PasswordInput and StateMessage can't come along: they declare typed
+  # requirements on Pam, which itself requires a real WlSessionLock, so QML
+  # rejects a greetd-backed stand-in. Those two are replaced locally.
+  install -d "$pkgdir/etc/xdg/quickshell/fenrir-greeter/modules"
+  ln -s ../../caelestia/modules/lock \
+    "$pkgdir/etc/xdg/quickshell/fenrir-greeter/modules/lock"
+
+  # Clock reads qs.services.Time, which resolves against this config root, not
+  # Caelestia's. Self-contained (29 lines, no other services), so link it in
+  # beside the local Colours shim.
+  ln -s ../../caelestia/services/Time.qml \
+    "$pkgdir/etc/xdg/quickshell/fenrir-greeter/services/Time.qml"
 
   # Deliberately NOT installed to /etc/greetd/config.toml: greetd owns that
   # path, and two packages shipping one file is a hard conflict pacman will not
