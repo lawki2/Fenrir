@@ -24,6 +24,7 @@ Singleton {
     property var languages3: ({})
     property var languages5: ({})
     property var countries: ({})
+    property var languageTypes: ({})
     property var layouts: ({})
     property var zoneCountry: ({})
 
@@ -67,19 +68,34 @@ Singleton {
         return country ? `${city} (${country})` : city;
     }
 
+    // "custom" is not a layout, it is a placeholder for people who hand-write
+    // their own xkb symbols file; picking it yields a dead keyboard.
+    readonly property var hiddenLayouts: ["custom"]
+
+    // iso-639-3 types every language: L living, H historical, C constructed,
+    // E extinct, S special. Anything but living is a curiosity here (Sanskrit,
+    // Toki Pona, Geez), and hiding it costs nobody their own language. Codes
+    // we have no type for, like the "ber" collection, are kept.
+    function isObscureLanguage(code: string): bool {
+        const type = root.languageTypes[code];
+        return type !== undefined && type !== "L";
+    }
+
     function sortedByLabel(options: var): var {
         return options.sort((a, b) => a.label.localeCompare(b.label));
     }
 
     function localeOptions(codes: var): var {
-        return root.sortedByLabel(codes.map(c => ({
+        const known = Object.keys(root.languageTypes).length > 0;
+        const kept = known ? codes.filter(c => !root.isObscureLanguage(c.split(/[._@]/)[0])) : codes;
+        return root.sortedByLabel(kept.map(c => ({
                         label: root.localeLabel(c),
                         value: c
                     })));
     }
 
     function layoutOptions(codes: var): var {
-        return root.sortedByLabel(codes.map(c => ({
+        return root.sortedByLabel(codes.filter(c => !root.hiddenLayouts.includes(c)).map(c => ({
                         label: root.layoutLabel(c),
                         value: c
                     })));
@@ -111,9 +127,15 @@ Singleton {
         path: "/usr/share/iso-codes/json/iso_639-3.json"
         onLoaded: {
             const out = {};
-            for (const e of JSON.parse(text())["639-3"])
+            const types = {};
+            for (const e of JSON.parse(text())["639-3"]) {
                 out[e.alpha_3] = e.name;
+                types[e.alpha_3] = e.type;
+                if (e.alpha_2)
+                    types[e.alpha_2] = e.type;
+            }
             root.languages3 = out;
+            root.languageTypes = types;
         }
     }
 
