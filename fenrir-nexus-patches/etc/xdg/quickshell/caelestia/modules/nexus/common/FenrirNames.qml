@@ -69,8 +69,14 @@ Singleton {
     }
 
     // "custom" is not a layout, it is a placeholder for people who hand-write
-    // their own xkb symbols file; picking it yields a dead keyboard.
-    readonly property var hiddenLayouts: ["custom"]
+    // their own xkb symbols file; picking it yields a dead keyboard. "epo" is
+    // constructed, matching the locales dropped below. Braille stays: it is an
+    // accessibility input method, not a curiosity.
+    readonly property var hiddenLayouts: ["custom", "epo"]
+
+    // Antarctica's ten zones are research stations with no civilian
+    // population. Inhabited remote places (Norfolk, St Helena, Pitcairn) stay.
+    readonly property var hiddenZoneCountries: ["AQ"]
 
     // iso-639-3 types every language: L living, H historical, C constructed,
     // E extinct, S special. Anything but living is a curiosity here (Sanskrit,
@@ -105,7 +111,7 @@ Singleton {
     // loaded - filtering against an empty map would blank the whole list.
     function timezoneOptions(codes: var): var {
         const known = Object.keys(root.zoneCountry).length > 0;
-        const kept = known ? codes.filter(tz => root.zoneCountry.hasOwnProperty(tz)) : codes;
+        const kept = known ? codes.filter(tz => root.zoneCountry.hasOwnProperty(tz) && !root.hiddenZoneCountries.includes(root.zoneCountry[tz])) : codes;
         return root.sortedByLabel(kept.map(tz => ({
                         label: root.timezoneLabel(tz),
                         value: tz
