@@ -1,7 +1,7 @@
 # Maintainer: Fenrir
 pkgname=fenrir-greeter
 pkgver=1.0.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Fenrir's themed QML/Quickshell login screen for greetd"
 arch=('x86_64')
 license=('GPL-3.0-only')
