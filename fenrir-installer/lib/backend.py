@@ -41,6 +41,13 @@ class InstallPlan:
     password: str
 
 
+# rsync --info=progress2 redraws with a carriage return, and Python's text
+# mode turns every \r into a line, so an unthrottled copy emits thousands of
+# these a second. Matches "  1,234,567  42%  120.00MB/s    0:00:07".
+PROGRESS_LINE = re.compile(r"^\s*[\d,]+\s+\d+%")
+PROGRESS_INTERVAL = 1.0
+
+
 def _stream(cmd, progress, **kwargs):
     progress(f"+ {' '.join(cmd)}")
     # stdbuf forces line buffering so pacstrap's progress streams live;
@@ -52,8 +59,16 @@ def _stream(cmd, progress, **kwargs):
         text=True,
         **kwargs,
     )
+    last_progress = 0.0
     for line in proc.stdout:
-        progress(line.rstrip())
+        line = line.rstrip()
+        # Rate-limit redraws only; anything else (errors included) goes through.
+        if PROGRESS_LINE.match(line):
+            now = time.monotonic()
+            if now - last_progress < PROGRESS_INTERVAL:
+                continue
+            last_progress = now
+        progress(line)
     proc.wait()
     if proc.returncode != 0:
         raise InstallError(f"{cmd[0]} exited with status {proc.returncode}")
