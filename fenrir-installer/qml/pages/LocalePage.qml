@@ -20,6 +20,11 @@ InstallerPage {
     readonly property string defaultTimezone: "America/New_York"
     readonly property string defaultLocale: "en_US.UTF-8"
 
+    // Bindings, not built in onClicked: FenrirNames loads its tables
+    // asynchronously, so these re-label themselves once it is ready.
+    readonly property var timezoneOptions: FenrirNames.timezoneOptions(timezoneProc.exited ? timezoneProc.lines : [root.defaultTimezone])
+    readonly property var localeOptions: FenrirNames.localeOptions(localeFile.loaded ? root.parseLocales(localeFile.text()) : [root.defaultLocale])
+
     ColumnLayout {
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
@@ -54,16 +59,16 @@ InstallerPage {
             first: true
             icon: "schedule"
             text: qsTr("Time zone")
-            subtext: root.selectedTimezone
-            onClicked: Picker.open(qsTr("Time zone"), timezoneProc.exited ? timezoneProc.lines : [root.defaultTimezone], root.selectedTimezone, value => root.selectedTimezone = value)
+            subtext: FenrirNames.timezoneLabel(root.selectedTimezone)
+            onClicked: Picker.open(qsTr("Time zone"), root.timezoneOptions, root.selectedTimezone, value => root.selectedTimezone = value)
         }
 
         NavRow {
             last: true
             icon: "translate"
             text: qsTr("Language")
-            subtext: root.selectedLocale
-            onClicked: Picker.open(qsTr("Language"), localeFile.loaded ? root.parseLocales(localeFile.text()) : [root.defaultLocale], root.selectedLocale, value => root.selectedLocale = value)
+            subtext: FenrirNames.localeLabel(root.selectedLocale)
+            onClicked: Picker.open(qsTr("Language"), root.localeOptions, root.selectedLocale, value => root.selectedLocale = value)
         }
     }
 
