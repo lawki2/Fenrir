@@ -380,9 +380,30 @@ def configure_locale(timezone, locale, progress):
     (TARGET / "etc/locale.conf").write_text(f"LANG={locale}\n")
 
 
+KBD_MODEL_MAP = Path("/usr/share/systemd/kbd-model-map")
+
+
+def _console_keymap(layout):
+    # X11 layouts and console keymaps are different namespaces ("se" vs
+    # "sv-latin1"); systemd ships the table that maps between them.
+    try:
+        lines = KBD_MODEL_MAP.read_text().splitlines()
+    except OSError:
+        return layout
+    rows = [l.split() for l in lines if l.strip() and not l.startswith("#")]
+    for row in rows:
+        if len(row) >= 2 and row[1] == layout:
+            return row[0]
+    for row in rows:
+        if len(row) >= 2 and row[1].split(",")[0] == layout:
+            return row[0]
+    return layout
+
+
 def configure_keyboard(layout, progress):
-    progress(f"Setting keyboard layout to {layout}")
-    (TARGET / "etc/vconsole.conf").write_text(f"KEYMAP={layout}\n")
+    keymap = _console_keymap(layout)
+    progress(f"Setting keyboard layout to {layout} (console keymap {keymap})")
+    (TARGET / "etc/vconsole.conf").write_text(f"KEYMAP={keymap}\n")
     xorg_dir = TARGET / "etc/X11/xorg.conf.d"
     xorg_dir.mkdir(parents=True, exist_ok=True)
     (xorg_dir / "00-keyboard.conf").write_text(
