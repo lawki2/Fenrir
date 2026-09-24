@@ -3,5 +3,60 @@
     "transparency": {
       "enabled": true
     }
+  },
+  "services": {
+    "smartScheme": false
+  },
+  "session": {
+    "commands": {
+      "logout": [
+        "caelestia",
+        "shell",
+        "lock",
+        "lock"
+      ]
+    }
+  },
+  "background": {
+    "desktopClock": {
+      "enabled": true,
+      "position": "middle-right"
+    }
+  },
+  "utilities": {
+    "quickToggles": [
+      {
+        "id": "wifi",
+        "enabled": true
+      },
+      {
+        "id": "bluetooth",
+        "enabled": true
+      },
+      {
+        "id": "mic",
+        "enabled": true
+      },
+      {
+        "id": "settings",
+        "enabled": true
+      },
+      {
+        "id": "gameMode",
+        "enabled": true
+      },
+      {
+        "id": "nightLight",
+        "enabled": true
+      },
+      {
+        "id": "dnd",
+        "enabled": true
+      },
+      {
+        "id": "vpn",
+        "enabled": false
+      }
+    ]
   }
 }

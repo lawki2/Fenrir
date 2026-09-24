@@ -26,6 +26,8 @@ InstallerPage {
     readonly property var localeOptions: FenrirNames.localeOptions(localeFile.loaded ? root.parseLocales(localeFile.text()) : [root.defaultLocale])
 
     ColumnLayout {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 

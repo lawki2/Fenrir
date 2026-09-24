@@ -1,0 +1,14 @@
+# Maintainer: Fenrir
+pkgname=fenrir-welcome
+# build-local-repo.sh stamps the build time here, so every rebuild is an update.
+pkgver=0
+pkgrel=1
+pkgdesc="Fenrir's welcome window in the app launcher; the window itself lives in Fenrir's caelestia-shell"
+arch=('any')
+license=('GPL-3.0-only')
+depends=('caelestia-cli')
+source=()
+
+package() {
+  install -Dm644 "$startdir/fenrir-welcome.desktop" "$pkgdir/usr/share/applications/fenrir-welcome.desktop"
+}

@@ -10,52 +10,92 @@ import qs.components.controls
 import qs.services
 import qs.modules.nexus.common
 
-// Fenrir's own Display settings page. Hyprland has no native "primary
-// monitor" concept (unlike Windows) - here "primary" is purely a UI
-// convention: whichever monitor is marked primary is translated to (0,0)
-// at apply time, every other monitor's position is kept relative to it.
-//
-// Persistence is genuinely new ground for this codebase (no existing
-// "GUI writes structured data, Hyprland's Lua config reads it at startup"
-// bridge exists anywhere else here): this page owns a small satellite file,
-// ~/.config/caelestia/nexus-monitors.lua (fully machine-generated, safe to
-// overwrite wholesale every save), loaded via one marker-commented block
-// this page inserts into ~/.config/caelestia/hypr-user.lua the first time
-// it successfully applies a layout - never touching hypr-user.lua's other,
-// hand-authored content. If hypr-user.lua already has its own hl.monitor()
-// calls outside that marker (a real, confirmed-possible state - not every
-// Fenrir install starts from a clean skel), this page refuses to
-// auto-inject and just says so, rather than silently stacking rules.
+// Hyprland has no primary monitor, so "primary" is moved to (0,0) on apply. Layout
+// lives in nexus-monitors.lua, loaded by a marker block this page adds to hypr-user.lua.
 PageBase {
     id: root
 
     title: qsTr("Display")
 
+    // lw/lh: size in Hyprland's layout, i.e. after rotation and scale; x/y use the same space.
     property var monitorList: []
     property string selectedName: ""
     readonly property var selected: root.monitorList.find(m => m.name === root.selectedName) ?? null
+    // Menus rebuild only when what they list changes. Keyed on `selected`, which a
+    // selectedName handler would still see as the previous display.
+    readonly property string displayKey: root.selected?.name ?? ""
+    readonly property string modeKey: root.selected ? `${root.selected.name} ${root.selected.width}x${root.selected.height} ${root.selected.scale}` : ""
 
-    property list<MenuItem> modeItems: []
-    property list<var> modeValues: []
+    property list<MenuItem> resolutionItems: []
+    property list<var> resolutionValues: []
+    property list<MenuItem> rateItems: []
+    property list<real> rateValues: []
+    property list<MenuItem> scaleItems: []
+    property list<real> scaleValues: []
+
+    // Index is Hyprland's transform; 4-7 are the mirrored versions, which this page leaves alone.
+    readonly property list<MenuItem> rotationItems: [
+        MenuItem {
+            text: qsTr("Normal")
+        },
+        MenuItem {
+            text: "90°"
+        },
+        MenuItem {
+            text: "180°"
+        },
+        MenuItem {
+            text: "270°"
+        }
+    ]
+    readonly property list<real> scaleSteps: [1, 1.25, 1.5, 1.75, 2, 2.5, 3]
 
     property bool hyprUserHasForeignRules: false
     property bool nexusBlockPresent: false
 
-    readonly property bool hasOverlap: root.monitorList.some(m => root.monitorList.some(o => o.name !== m.name && o.x < m.x + m.width && o.x + o.width > m.x && o.y < m.y + m.height && o.y + o.height > m.y))
+    readonly property bool hasOverlap: root.monitorList.some(m => root.monitorList.some(o => o.name !== m.name && o.x < m.x + m.lw && o.x + o.lw > m.x && o.y < m.y + m.lh && o.y + o.lh > m.y))
+
+    function withSize(m: var): var {
+        const swap = m.transform % 2 === 1;
+        m.lw = (swap ? m.height : m.width) / m.scale;
+        m.lh = (swap ? m.width : m.height) / m.scale;
+        return m;
+    }
+
+    // Hyprland rejects a scale that leaves a fractional layout size and silently picks another.
+    function scaleFits(width: real, height: real, scale: real): bool {
+        return Number.isInteger(width / scale) && Number.isInteger(height / scale);
+    }
+
+    function modesOf(m: var): var {
+        return (m?.availableModes ?? []).map(s => s.match(/^(\d+)x(\d+)@([\d.]+)Hz$/)).filter(match => match).map(match => ({
+                    width: parseInt(match[1], 10),
+                    height: parseInt(match[2], 10),
+                    rate: parseFloat(match[3])
+                }));
+    }
+
+    function makeItems(old: var, texts: var): var {
+        for (const item of old)
+            item.destroy();
+        return texts.map(text => menuItemComp.createObject(root, {
+                    text
+                }));
+    }
 
     function buildMonitorList(): void {
-        const list = Hypr.monitors.values.map(m => ({
-            name: m.name,
-            x: m.x,
-            y: m.y,
-            width: m.width,
-            height: m.height,
-            refreshRate: m.lastIpcObject?.refreshRate ?? 60,
-            transform: m.lastIpcObject?.transform ?? 0,
-            scale: m.scale,
-            availableModes: m.lastIpcObject?.availableModes ?? [],
-            primary: false
-        }));
+        const list = Hypr.monitors.values.map(m => root.withSize({
+                name: m.name,
+                x: m.x,
+                y: m.y,
+                width: m.width,
+                height: m.height,
+                refreshRate: m.lastIpcObject?.refreshRate ?? 60,
+                transform: m.lastIpcObject?.transform ?? 0,
+                scale: m.scale,
+                availableModes: m.lastIpcObject?.availableModes ?? [],
+                primary: false
+            }));
         if (list.length && !list.some(m => m.primary))
             list[0].primary = true;
         root.monitorList = list;
@@ -63,89 +103,93 @@ PageBase {
             root.selectedName = list[0].name;
     }
 
-    function refreshModeItems(): void {
-        const m = root.selected;
-        const modes = m?.availableModes ?? [];
-        const seen = {};
-        const items = [];
-        const values = [];
-        for (const modeStr of modes) {
-            const match = modeStr.match(/^(\d+)x(\d+)@([\d.]+)Hz$/);
-            if (!match)
-                continue;
-            const hz = Math.round(parseFloat(match[3]));
-            const key = `${match[1]}x${match[2]}@${hz}`;
-            if (seen[key])
-                continue;
-            seen[key] = true;
-            items.push(modeItemComp.createObject(root, {
-                text: `${match[1]}×${match[2]} @ ${hz}Hz`
-            }));
-            values.push({
-                width: parseInt(match[1], 10),
-                height: parseInt(match[2], 10),
-                refreshRate: parseFloat(match[3])
-            });
-        }
-        root.modeItems = items;
-        root.modeValues = values;
+    function refreshResolutionItems(): void {
+        const seen = new Set();
+        const values = root.modesOf(root.selected).filter(v => {
+            const key = `${v.width}x${v.height}`;
+            if (seen.has(key))
+                return false;
+            seen.add(key);
+            return true;
+        });
+        root.resolutionValues = values;
+        root.resolutionItems = root.makeItems(root.resolutionItems, values.map(v => `${v.width} × ${v.height}`));
     }
 
-    onSelectedNameChanged: root.refreshModeItems()
+    function refreshRateAndScaleItems(): void {
+        const m = root.selected;
+        const seen = new Set();
+        const rates = root.modesOf(m).filter(v => {
+            if (!m || v.width !== m.width || v.height !== m.height || seen.has(Math.round(v.rate)))
+                return false;
+            seen.add(Math.round(v.rate));
+            return true;
+        }).map(v => v.rate);
+        root.rateValues = rates;
+        root.rateItems = root.makeItems(root.rateItems, rates.map(r => `${Math.round(r)} Hz`));
 
-    function setSelectedMode(width: real, height: real, refreshRate: real): void {
+        const scales = m ? root.scaleSteps.filter(s => root.scaleFits(m.width, m.height, s)) : [];
+        if (m && !scales.some(s => Math.abs(s - m.scale) < 0.001))
+            scales.push(m.scale);
+        scales.sort((a, b) => a - b);
+        root.scaleValues = scales;
+        root.scaleItems = root.makeItems(root.scaleItems, scales.map(s => `${Math.round(s * 100)}%`));
+    }
+
+    onDisplayKeyChanged: root.refreshResolutionItems()
+    onModeKeyChanged: root.refreshRateAndScaleItems()
+
+    // Displays right of or below the selected one follow its new edge, so resizing it keeps them touching.
+    function updateSelected(changes: var): void {
+        const old = root.selected;
+        if (!old)
+            return;
+        const next = root.withSize(Object.assign({}, old, changes));
+        const dx = next.lw - old.lw;
+        const dy = next.lh - old.lh;
         root.monitorList = root.monitorList.map(m => {
-            if (m.name !== root.selectedName)
-                return m;
-            return {
-                name: m.name,
-                x: m.x,
-                y: m.y,
-                width: width,
-                height: height,
-                refreshRate: refreshRate,
-                transform: m.transform,
-                scale: m.scale,
-                availableModes: m.availableModes,
-                primary: m.primary
-            };
+            if (m.name === old.name)
+                return next;
+            const moved = Object.assign({}, m);
+            if (m.x >= old.x + old.lw)
+                moved.x += dx;
+            if (m.y >= old.y + old.lh)
+                moved.y += dy;
+            return moved;
         });
         root.apply();
     }
 
+    function setResolution(width: real, height: real): void {
+        const m = root.selected;
+        const modes = root.modesOf(m).filter(v => v.width === width && v.height === height);
+        const sameRate = modes.find(v => Math.round(v.rate) === Math.round(m.refreshRate));
+        root.updateSelected({
+            width,
+            height,
+            refreshRate: (sameRate ?? modes[0]).rate,
+            scale: root.scaleFits(width, height, m.scale) ? m.scale : 1
+        });
+    }
+
+    function setRotation(rotation: int): void {
+        root.updateSelected({
+            transform: (root.selected.transform & 4) | rotation
+        });
+    }
+
     function setPrimary(name: string): void {
-        root.monitorList = root.monitorList.map(m => ({
-            name: m.name,
-            x: m.x,
-            y: m.y,
-            width: m.width,
-            height: m.height,
-            refreshRate: m.refreshRate,
-            transform: m.transform,
-            scale: m.scale,
-            availableModes: m.availableModes,
-            primary: m.name === name
-        }));
+        root.monitorList = root.monitorList.map(m => Object.assign({}, m, {
+                primary: m.name === name
+            }));
         root.apply();
     }
 
     function setPosition(name: string, x: real, y: real): void {
-        root.monitorList = root.monitorList.map(m => {
-            if (m.name !== name)
-                return m;
-            return {
-                name: m.name,
-                x: x,
-                y: y,
-                width: m.width,
-                height: m.height,
-                refreshRate: m.refreshRate,
-                transform: m.transform,
-                scale: m.scale,
-                availableModes: m.availableModes,
-                primary: m.primary
-            };
-        });
+        root.monitorList = root.monitorList.map(m => m.name === name ? Object.assign({}, m, {
+                x,
+                y
+            }) : m);
         root.apply();
     }
 
@@ -195,9 +239,7 @@ PageBase {
     function checkHyprUserState(): void {
         const text = hyprUserFile.text();
         root.nexusBlockPresent = text.includes(root.nexusMarkerBegin);
-        // Any hl.monitor( call outside our own marker block means someone
-        // hand-authored monitor rules in this file already - don't stack
-        // a second, competing source of truth on top of it.
+        // Hand-written hl.monitor() calls outside our block: don't stack a second source.
         const withoutOurBlock = root.nexusBlockPresent ? text.slice(0, text.indexOf(root.nexusMarkerBegin)) + text.slice(text.indexOf(root.nexusMarkerEnd) + root.nexusMarkerEnd.length) : text;
         root.hyprUserHasForeignRules = withoutOurBlock.includes("hl.monitor(");
     }
@@ -215,7 +257,6 @@ PageBase {
 
     Component.onCompleted: {
         root.buildMonitorList();
-        root.refreshModeItems();
         root.checkHyprUserState();
     }
 
@@ -226,7 +267,7 @@ PageBase {
         spacing: Tokens.spacing.large
 
         Component {
-            id: modeItemComp
+            id: menuItemComp
 
             MenuItem {}
         }
@@ -247,13 +288,7 @@ PageBase {
 
             path: `${Quickshell.env("HOME")}/.config/caelestia/hypr-user.lua`
             printErrors: false
-            // Component.onCompleted's checkHyprUserState() call runs
-            // eagerly, but if this FileView's initial read is actually
-            // asynchronous, that call would see empty/stale text with
-            // nothing to re-trigger it once the real content lands -
-            // matching services/Colours.qml's own onLoaded-driven pattern
-            // fixes that; re-running the check here is a harmless no-op
-            // if the eager call already had the real text.
+            // The first read can be async, so re-check once the text actually lands.
             onLoaded: root.checkHyprUserState()
             onLoadFailed: error => {
                 if (error === FileViewError.FileNotFound)
@@ -296,15 +331,44 @@ PageBase {
         }
 
         SelectRow {
-            visible: root.modeItems.length > 0
+            visible: root.resolutionItems.length > 0
             first: true
-            label: qsTr("Resolution & refresh rate")
-            menuItems: root.modeItems
-            active: root.modeItems[Math.max(0, root.modeValues.findIndex(v => v.width === root.selected?.width && v.height === root.selected?.height && Math.round(v.refreshRate) === Math.round(root.selected?.refreshRate ?? 0)))]
+            label: qsTr("Resolution")
+            menuItems: root.resolutionItems
+            active: root.resolutionItems[root.resolutionValues.findIndex(v => v.width === root.selected?.width && v.height === root.selected?.height)] ?? null
             onSelected: item => {
-                const v = root.modeValues[root.modeItems.indexOf(item)];
-                root.setSelectedMode(v.width, v.height, v.refreshRate);
+                const v = root.resolutionValues[root.resolutionItems.indexOf(item)];
+                root.setResolution(v.width, v.height);
             }
+        }
+
+        SelectRow {
+            visible: root.rateItems.length > 0
+            label: qsTr("Refresh rate")
+            menuItems: root.rateItems
+            active: root.rateItems[root.rateValues.findIndex(r => Math.round(r) === Math.round(root.selected?.refreshRate ?? 0))] ?? null
+            onSelected: item => root.updateSelected({
+                    refreshRate: root.rateValues[root.rateItems.indexOf(item)]
+                })
+        }
+
+        SelectRow {
+            visible: root.selected !== null
+            label: qsTr("Rotation")
+            menuItems: root.rotationItems
+            active: root.rotationItems[(root.selected?.transform ?? 0) % 4]
+            onSelected: item => root.setRotation(root.rotationItems.indexOf(item))
+        }
+
+        SelectRow {
+            visible: root.scaleItems.length > 0
+            label: qsTr("Scale")
+            subtext: qsTr("Only steps that fit this resolution exactly")
+            menuItems: root.scaleItems
+            active: root.scaleItems[root.scaleValues.findIndex(s => Math.abs(s - (root.selected?.scale ?? 1)) < 0.001)] ?? null
+            onSelected: item => root.updateSelected({
+                    scale: root.scaleValues[root.scaleItems.indexOf(item)]
+                })
         }
 
         ToggleRow {

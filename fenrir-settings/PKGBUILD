@@ -1,0 +1,36 @@
+# Maintainer: Fenrir
+pkgname=fenrir-settings
+# build-local-repo.sh stamps the build time here, so every rebuild is an update.
+pkgver=0
+pkgrel=1
+pkgdesc="Fenrir's system defaults: Hyprland, shell and terminal config, printing, updates"
+arch=('any')
+license=('GPL-3.0-only')
+depends=(
+  'hyprland' 'fish' 'foot' 'fastfetch' 'starship'
+  'hyprsunset'
+  'udisks2' 'gvfs' 'gvfs-mtp' 'gvfs-smb'
+  'cups' 'ipp-usb' 'avahi' 'nss-mdns'
+  'pacman-contrib' 'fakeroot' 'fwupd'
+  'fenrir-welcome'
+)
+install=fenrir-settings.install
+source=()
+
+package() {
+  local share="$pkgdir/usr/share/fenrir"
+  install -d "$share"
+  # -r, not -a: -a would carry the build user's uid into the package.
+  cp -r "$startdir/hypr" "$startdir/xdg" "$share/"
+  install -Dm644 "$startdir/hypr-loader.lua" "$share/hypr-loader.lua"
+  install -Dm644 "$startdir/starship.toml" "$share/starship.toml"
+  install -Dm644 "$startdir/fish/vendor_conf.d/fenrir.fish" "$pkgdir/usr/share/fish/vendor_conf.d/fenrir.fish"
+  install -Dm644 "$startdir/fish/vendor_functions.d/fish_greeting.fish" "$pkgdir/usr/share/fish/vendor_functions.d/fish_greeting.fish"
+  install -Dm644 "$startdir/system/10-fenrir-avahi.conf" "$pkgdir/etc/systemd/resolved.conf.d/10-fenrir-avahi.conf"
+  install -Dm755 "$startdir/bin/fenrir-migrate-home" "$pkgdir/usr/lib/fenrir/fenrir-migrate-home"
+  install -Dm755 "$startdir/bin/fenrir-pkg" "$pkgdir/usr/lib/fenrir/fenrir-pkg"
+  install -Dm755 "$startdir/bin/fenrir-branding" "$pkgdir/usr/lib/fenrir/fenrir-branding"
+  install -Dm644 "$startdir/system/zz-fenrir-branding.hook" "$pkgdir/usr/share/libalpm/hooks/zz-fenrir-branding.hook"
+  install -Dm644 "$startdir/system/os-release" "$share/os-release"
+  install -Dm644 "$startdir/system/org.fenrir.pkg.policy" "$pkgdir/usr/share/polkit-1/actions/org.fenrir.pkg.policy"
+}

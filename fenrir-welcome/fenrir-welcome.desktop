@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome
+GenericName=Welcome to Fenrir
+Comment=Take the tour and add optional extras like gaming, Flatpak and drivers
+Exec=caelestia shell welcome open
+Icon=help-about
+Categories=System;
+Keywords=welcome;tour;extras;drivers;gaming;flatpak;codecs;

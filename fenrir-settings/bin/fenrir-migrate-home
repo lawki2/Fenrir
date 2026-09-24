@@ -1,0 +1,52 @@
+#!/bin/sh
+# Moves one home off Fenrir's old per-user copy of the dotfiles (~/.local/share/caelestia,
+# symlinked into ~/.config) onto the shipped config. Runs as that user; a no-op once done.
+set -eu
+
+cfg="$HOME/.config"
+old="$HOME/.local/share/caelestia"
+[ -L "$cfg/hypr" ] && [ "$(readlink "$cfg/hypr")" = "../.local/share/caelestia/hypr" ] || exit 0
+
+# The generated colour scheme is personal state, not config, so it comes along.
+new="$cfg/hypr.fenrir-new"
+rm -rf "$new"
+mkdir -p "$new/scheme"
+ln -s /usr/share/fenrir/hypr-loader.lua "$new/hyprland.lua"
+if [ -f "$old/hypr/scheme/current.lua" ]; then
+    cp "$old/hypr/scheme/current.lua" "$new/scheme/current.lua"
+fi
+
+# btop and uwsm have no system-wide default, so they become real per-user copies.
+for app in btop uwsm; do
+    if [ -L "$cfg/$app" ] && [ -d "$old/$app" ]; then
+        cp -a "$old/$app" "$cfg/$app.fenrir-new"
+        rm "$cfg/$app"
+        mv "$cfg/$app.fenrir-new" "$cfg/$app"
+    fi
+done
+
+# fish keeps its own state (universal variables, added functions); config.fish and the
+# greeting now ship in /usr/share/fish/vendor_*.
+if [ -L "$cfg/fish" ] && [ -d "$old/fish" ]; then
+    cp -a "$old/fish" "$cfg/fish.fenrir-new"
+    rm -f "$cfg/fish.fenrir-new/config.fish" "$cfg/fish.fenrir-new/functions/fish_greeting.fish"
+    # Early ISOs shipped a developer's own fish_user_paths entry.
+    [ "$HOME" = /home/loke ] || sed -i '/^SETUVAR fish_user_paths:\/home\/loke\/\\x2edotnet\/tools$/d' "$cfg/fish.fenrir-new/fish_variables" 2>/dev/null || true
+    rm "$cfg/fish"
+    mv "$cfg/fish.fenrir-new" "$cfg/fish"
+fi
+
+# These now come from /usr/share/fenrir unless the user makes their own.
+for link in foot fastfetch starship.toml; do
+    if [ -L "$cfg/$link" ]; then
+        rm "$cfg/$link"
+    fi
+done
+
+rm "$cfg/hypr"
+mv "$new" "$cfg/hypr"
+
+backup="$old.pre-fenrir-settings"
+[ -e "$backup" ] && backup="$backup.$(date +%s)"
+mv "$old" "$backup"
+echo "Moved $HOME to the shipped Fenrir config; the old copy is in $backup"

@@ -10,13 +10,18 @@ import qs.modules.nexus.pages
 import qs.modules.nexus.pages.apps
 import qs.modules.nexus.pages.audio
 import qs.modules.nexus.pages.bluetooth
+import qs.modules.nexus.pages.desktop
 import qs.modules.nexus.pages.firewall
 import qs.modules.nexus.pages.keybinds
 import qs.modules.nexus.pages.monitors
 import qs.modules.nexus.pages.network
+import qs.modules.nexus.pages.nightlight
 import qs.modules.nexus.pages.panels
+import qs.modules.nexus.pages.power
+import qs.modules.nexus.pages.printers
 import qs.modules.nexus.pages.services
 import qs.modules.nexus.pages.system
+import qs.modules.nexus.pages.updates
 import qs.modules.nexus.pages.wallandstyle
 import qs.modules.nexus.pages.panels.taskbar
 
@@ -42,6 +47,14 @@ QtObject {
                 }
             }
         },
+        Component {
+            // Desktop
+            StackPage {
+                Component {
+                    DesktopPage {}
+                }
+            }
+        },
 
         // Connectivity
         Component {
@@ -49,6 +62,14 @@ QtObject {
             StackPage {
                 Component {
                     MonitorsPage {}
+                }
+            }
+        },
+        Component {
+            // Night light
+            StackPage {
+                Component {
+                    NightLightPage {}
                 }
             }
         },
@@ -101,6 +122,14 @@ QtObject {
             }
         },
         Component {
+            // Printers
+            StackPage {
+                Component {
+                    PrintersPage {}
+                }
+            }
+        },
+        Component {
             // Audio
             StackPage {
                 Component {
@@ -114,24 +143,23 @@ QtObject {
 
         // System
         Component {
-            PlaceholderComp {}
-        },
-        Component {
-            PlaceholderComp {}
-        },
-        Component {
-            // System
+            // Power & sleep
             StackPage {
                 Component {
-                    SystemPage {}
-                }
-                Component {
-                    LayoutPicker {}
-                }
-                Component {
-                    TimezonePicker {}
+                    PowerPage {}
                 }
             }
+        },
+        Component {
+            // Updates
+            StackPage {
+                Component {
+                    UpdatesPage {}
+                }
+            }
+        },
+        Component {
+            PlaceholderComp {}
         },
 
         // Shell
@@ -181,9 +209,6 @@ QtObject {
                 Component {
                     KeybindsPage {}
                 }
-                Component {
-                    SwitchShortcutPicker {}
-                }
             }
         },
         Component {
@@ -216,6 +241,12 @@ QtObject {
             StackPage {
                 Component {
                     LanguageAndRegion {}
+                }
+                Component {
+                    LayoutPicker {}
+                }
+                Component {
+                    TimezonePicker {}
                 }
             }
         },

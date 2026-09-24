@@ -18,7 +18,7 @@ Item {
     readonly property list<string> stepLabels: [
         "Partitioning the disk",
         "Installing packages",
-        "Copying configuration",
+        "Setting up package sources",
         "Configuring the system",
         "Installing the bootloader",
         "Finishing up"
@@ -26,10 +26,10 @@ Item {
     readonly property list<string> stepTriggers: [
         "Clearing any leftover mounts",
         "Installing packages",
-        "Copying Caelestia configuration",
+        "Initializing the pacman keyring",
         "Setting timezone",
         "Writing kernel command line",
-        "Enabling "
+        "Enabling NetworkManager"
     ]
 
     property int currentStep: 0
@@ -61,7 +61,9 @@ Item {
     }
 
     function start(plan): void {
-        installProc.command = ["python3", "/usr/lib/fenrir-installer/cli.py", "install", JSON.stringify(plan)];
+        // In the environment, not argv: argv is readable by every user via ps.
+        installProc.environment = { FENRIR_INSTALL_PLAN: JSON.stringify(plan) };
+        installProc.command = ["python3", "/usr/lib/fenrir-installer/cli.py", "install"];
         installProc.running = true;
     }
 

@@ -1,7 +1,8 @@
-"""Does the actual install: partitioning, pacstrap, target configuration.
+"""Does the actual install: partitioning, cloning the live system, target configuration.
 Runs as root already (launched via pkexec) — no escalation happens here.
 """
 
+import json
 import re
 import shutil
 import subprocess
@@ -10,7 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 TARGET = Path("/mnt")
-PACKAGE_LIST = Path("/etc/fenrir-packages.x86_64")
 BTRFS_SUBVOLUMES = ("@", "@home", "@root", "@srv", "@cache", "@tmp", "@log")
 BTRFS_MOUNTS = {
     "@": "/",
@@ -41,17 +41,15 @@ class InstallPlan:
     password: str
 
 
-# rsync --info=progress2 redraws with a carriage return, and Python's text
-# mode turns every \r into a line, so an unthrottled copy emits thousands of
-# these a second. Matches "  1,234,567  42%  120.00MB/s    0:00:07".
+# rsync --info=progress2 redraws with \r, which text mode turns into thousands
+# of lines a second. Matches "  1,234,567  42%  120.00MB/s    0:00:07".
 PROGRESS_LINE = re.compile(r"^\s*[\d,]+\s+\d+%")
 PROGRESS_INTERVAL = 1.0
 
 
 def _stream(cmd, progress, **kwargs):
     progress(f"+ {' '.join(cmd)}")
-    # stdbuf forces line buffering so pacstrap's progress streams live;
-    # nice stops it starving the compositor.
+    # stdbuf so output streams live; nice so it doesn't starve the compositor.
     proc = subprocess.Popen(
         ["nice", "-n", "10", "stdbuf", "-oL", "-eL", *cmd],
         stdout=subprocess.PIPE,
@@ -62,7 +60,6 @@ def _stream(cmd, progress, **kwargs):
     last_progress = 0.0
     for line in proc.stdout:
         line = line.rstrip()
-        # Rate-limit redraws only; anything else (errors included) goes through.
         if PROGRESS_LINE.match(line):
             now = time.monotonic()
             if now - last_progress < PROGRESS_INTERVAL:
@@ -75,14 +72,12 @@ def _stream(cmd, progress, **kwargs):
 
 
 def _chroot(cmd, progress):
-    # Strip LD_PRELOAD (set by _stream's stdbuf wrapper) before it leaks
-    # into the chroot via arch-chroot's inherited environment.
+    # Drop the LD_PRELOAD stdbuf sets, or it leaks into the chroot.
     _stream(["arch-chroot", str(TARGET), "env", "-u", "LD_PRELOAD", *cmd], progress)
 
 
 def _boot_medium_disk():
-    # Resolves the live boot medium to its parent disk so list_disks()
-    # can exclude it — wiping the running installer's own USB is unrecoverable.
+    # The live USB's own disk, so list_disks() can never offer it for wiping.
     try:
         source = subprocess.run(
             ["findmnt", "-no", "SOURCE", "/run/archiso/bootmnt"],
@@ -96,7 +91,7 @@ def _boot_medium_disk():
             capture_output=True,
             text=True,
         ).stdout.strip()
-        # Whole-disk media (e.g. optical, no partition table) have no parent.
+        # Whole-disk media (e.g. optical) have no parent.
         return parent or source.removeprefix("/dev/")
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
@@ -109,9 +104,6 @@ def list_disks():
         capture_output=True,
         text=True,
     ).stdout
-    import json
-
-    data = json.loads(out)
     boot_disk = _boot_medium_disk()
     return [
         {
@@ -119,8 +111,7 @@ def list_disks():
             "size": int(d["size"]),
             "model": (d.get("model") or "").strip(),
         }
-        for d in data["blockdevices"]
-        # Exclude zram/loop pseudo-disks and the live boot medium itself.
+        for d in json.loads(out)["blockdevices"]
         if d["type"] == "disk" and not d["name"].startswith(("zram", "loop")) and d["name"] != boot_disk
     ]
 
@@ -133,7 +124,6 @@ def _partition_paths(disk):
 def partition_and_mount(disk, esp_mib, progress):
     boot_part, root_part = _partition_paths(disk)
 
-    # Clear any mount left by a failed previous attempt; harmless if none exists.
     progress("Clearing any leftover mounts from a previous attempt")
     subprocess.run(
         ["umount", "-R", str(TARGET)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -148,8 +138,7 @@ def partition_and_mount(disk, esp_mib, progress):
     )
     _stream(["sgdisk", "-n", "2:0:0", "-t", "2:8300", "-c", "2:FENRIR_ROOT", disk], progress)
     _stream(["partprobe", disk], progress)
-    # partprobe can return before udev finishes creating the new device
-    # nodes; wait for udev before mkfs races it.
+    # partprobe can return before udev creates the device nodes mkfs needs.
     _stream(["udevadm", "settle"], progress)
 
     progress("Formatting partitions")
@@ -180,126 +169,85 @@ def partition_and_mount(disk, esp_mib, progress):
     _stream(["mount", boot_part, str(boot_path)], progress)
 
 
-def read_package_list():
-    if not PACKAGE_LIST.exists():
-        raise InstallError(f"{PACKAGE_LIST} is missing from the live image")
-    packages = []
-    for line in PACKAGE_LIST.read_text().splitlines():
-        name = line.split("#", 1)[0].strip()
-        if name:
-            packages.append(name)
-    return packages
-
-
-# The overlay lowerdir: the squashfs exactly as built, without whatever the
-# live session has written since boot.
+# The squashfs as built, without anything the live session has written since.
 LIVE_ROOTFS = Path("/run/archiso/airootfs")
 
-# Live-only state that must never reach an installed system.
+# Live-only state that the clone must never carry onto a real system.
 LIVE_ONLY_PATHS = (
-    "etc/fenrir-packages.x86_64",  # also what gates the installer's autostart
+    "etc/fenrir-packages.x86_64",  # also marks a running live image
     "etc/sddm.conf.d/autologin.conf",
-    "etc/mkinitcpio.conf.d/archiso.conf",  # archiso HOOKS; the target needs its own
-    "etc/polkit-1/rules.d/49-nopasswd_global.rules",  # blanket wheel rule
-    "etc/machine-id",  # must be unique per machine
-    "etc/pacman.d/gnupg",  # local signing key must be per-machine, like ssh host keys
-    "opt/fenrir-local-repo",  # ~130MB of packages, and [fenrir-local] goes with it
+    "etc/mkinitcpio.conf.d/archiso.conf",
+    "etc/polkit-1/rules.d/49-nopasswd_global.rules",
+    "etc/machine-id",
+    "etc/pacman.d/gnupg",
+    "etc/ssh/ssh_host_*",  # regenerated on first boot; never share host keys
+    "var/cache/pacman/pkg/*",
+    "var/lib/pacman/sync/*",
+    "var/log/journal/*",
 )
 
 
 def clone_live_rootfs(progress):
     """Copies the live system to disk instead of re-downloading every package."""
     if not LIVE_ROOTFS.is_dir():
-        progress("Installing packages (no live root filesystem found)")
-        pacstrap_target(progress)
-        return
+        raise InstallError(
+            f"{LIVE_ROOTFS} is missing - the installer must run from a booted "
+            "Fenrir live image, which is what it copies onto the disk."
+        )
 
     progress("Installing packages by copying the live system")
+    excludes = [f"--exclude=/{rel}" for rel in LIVE_ONLY_PATHS]
     _stream(
-        ["rsync", "-aHAX", "--numeric-ids", "--info=progress2",
+        ["rsync", "-aHAX", "--numeric-ids", "--info=progress2", *excludes,
          f"{LIVE_ROOTFS}/", f"{TARGET}/"],
         progress,
     )
-    _scrub_live_state(progress)
 
-
-def initialize_keyring(progress):
-    # The clone comes from /run/archiso/airootfs, the read-only squashfs
-    # lowerdir - but the live keyring is built at boot by pacman-init.service
-    # into the overlay's upper layer, so the target inherits none at all and
-    # every pacman-key call fails its permission check. Idempotent, so it is
-    # safe on the pacstrap fallback path too.
-    progress("Initializing the pacman keyring")
-    _chroot(["pacman-key", "--init"], progress)
-    _chroot(["pacman-key", "--populate"], progress)
-
-
-def _remove_pacman_section(pacman_conf, section):
-    lines = pacman_conf.read_text().splitlines()
-    try:
-        start = lines.index(f"[{section}]")
-    except ValueError:
-        return
-    end = start + 1
-    while end < len(lines) and not lines[end].startswith("["):
-        end += 1
-    while end > start + 1 and not lines[end - 1].strip():
-        end -= 1  # keep the blank line that separated the next section
-    del lines[start:end]
-    pacman_conf.write_text("\n".join(lines) + "\n")
-
-
-def _scrub_live_state(progress):
-    progress("Removing live-session state")
-
-    for rel in LIVE_ONLY_PATHS:
-        path = TARGET / rel
-        if path.is_dir() and not path.is_symlink():
-            shutil.rmtree(path, ignore_errors=True)
-        else:
-            path.unlink(missing_ok=True)
-
-    # liveuser holds uid 1000, so leaving it would push the real account to
-    # 1001 and strand a passwordless-login ghost in wheel/autologin.
+    # liveuser holds uid 1000; left in place it pushes the real account to 1001
+    # and strands a passwordless ghost in wheel.
     if (TARGET / "home/liveuser").exists():
         _chroot(["userdel", "-r", "liveuser"], progress)
 
-    _remove_pacman_section(TARGET / "etc/pacman.conf", "fenrir-local")
 
-    # Regenerated on first boot; shared host keys across installs would be bad.
-    ssh_dir = TARGET / "etc/ssh"
-    if ssh_dir.is_dir():
-        for key in ssh_dir.glob("ssh_host_*"):
-            key.unlink(missing_ok=True)
-
-    for rel in ("var/cache/pacman/pkg", "var/lib/pacman/sync", "var/log/journal"):
-        path = TARGET / rel
-        if path.is_dir():
-            shutil.rmtree(path, ignore_errors=True)
-            path.mkdir(parents=True, exist_ok=True)
-
-
-def pacstrap_target(progress):
-    packages = read_package_list()
-    _stream(["pacstrap", "-K", str(TARGET), *packages], progress)
+# Deliberately kept: VM guest agents, the accessibility stack, gparted and
+# network diagnostics.
+LIVE_ONLY_PACKAGES = (
+    "mkinitcpio-archiso",
+    "cachy-chroot", "cloud-init", "darkhttpd",
+    "clonezilla", "partclone", "partimage", "refind",
+    "memtest86+", "memtest86+-efi",
+    "open-iscsi", "nbd", "dmraid",
+    "jfsutils", "nilfs-utils", "udftools", "linux-atm",
+    "wvdial", "xl2tpd", "rp-pppoe",
+    "irssi", "lftp",
+)
 
 
-# Filled in once the dedicated Fenrir package-signing key exists (see
-# archiso/airootfs/etc/pacman.d/fenrir-signing-key.asc and secrets/ in the
-# repo root) - re-derive via:
-#   GNUPGHOME=secrets/gnupg gpg --show-keys --with-colons \
-#       archiso/airootfs/etc/pacman.d/fenrir-signing-key.asc | awk -F: '/^fpr/{print $10; exit}'
+def remove_live_only_packages(progress):
+    # Non-fatal: pacman aborts the whole transaction if anything still depends
+    # on one of these, and a slightly bigger install beats a failed one.
+    progress("Removing live-only tooling")
+    proc = subprocess.run(
+        ["arch-chroot", str(TARGET), "pacman", "-Rns", "--noconfirm", *LIVE_ONLY_PACKAGES],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        progress("Note: live-only tooling could not be removed - continuing")
+
+
+def initialize_keyring(progress):
+    # The live keyring is built at boot into the overlay's upper layer, so the
+    # clone of the squashfs lowerdir carries none.
+    progress("Initializing the pacman keyring")
+    _chroot(["sh", "-c", "pacman-key --init && pacman-key --populate"], progress)
+
+
+# Public half is archiso/airootfs/etc/pacman.d/fenrir-signing-key.asc.
 FENRIR_REPO_KEY_FPR = "BE0B53BD597DF2CDB8437E869C17423CED27E4BE"
 
 
 def configure_fenrir_repo(progress):
-    # No key generated yet - a build made before then should ship with no
-    # [fenrir] repo configured, not a hard install failure the moment
-    # pacman-key is asked to trust a fingerprint that doesn't exist yet.
-    if FENRIR_REPO_KEY_FPR is None:
-        progress("Skipping Fenrir package repo — no signing key configured yet")
-        return
-
     progress("Configuring the Fenrir package repository")
 
     live_mirrorlist = Path("/etc/pacman.d/fenrir-mirrorlist")
@@ -313,14 +261,9 @@ def configure_fenrir_repo(progress):
     (pacman_d / "fenrir-mirrorlist").write_text(live_mirrorlist.read_text())
     (pacman_d / "fenrir-signing-key.asc").write_text(live_key.read_text())
 
-    # Anchored on [core]: it's guaranteed present in pacman's own default
-    # template pacstrap just laid down, unlike the CachyOS sections.
     pacman_conf = TARGET / "etc/pacman.conf"
     lines = pacman_conf.read_text().splitlines()
     if not any(line.strip() == "[fenrir]" for line in lines):
-        # A bare next() raises StopIteration, which surfaces through cli.py
-        # as "INSTALL_ERROR:" with no message at all - miserable to debug
-        # from a progress log.
         anchor = next((i for i, line in enumerate(lines) if line.strip() == "[core]"), None)
         if anchor is None:
             raise InstallError(f"No [core] section in {pacman_conf} to anchor [fenrir] against")
@@ -332,54 +275,9 @@ def configure_fenrir_repo(progress):
         ]
         pacman_conf.write_text("\n".join(lines) + "\n")
 
-    # initialize_keyring() has already built a fresh keyring for the target,
-    # so pacman-key has something to add to.
-    _chroot(["pacman-key", "--add", "/etc/pacman.d/fenrir-signing-key.asc"], progress)
-    _chroot(["pacman-key", "--lsign-key", FENRIR_REPO_KEY_FPR], progress)
-
-
-# pacstrap lays down pacman's stock pacman.conf, and no CachyOS package
-# adds its repos (they ship mirrorlist files only) - so without this an
-# installed system can never update its kernel, nvidia or any cachyos pkg.
-CACHYOS_REPOS = ("cachyos-v3", "cachyos-extra-v3", "cachyos-core-v3", "cachyos")
-
-
-def configure_cachyos_repos(progress):
-    progress("Configuring the CachyOS package repositories")
-
-    pacman_conf = TARGET / "etc/pacman.conf"
-    lines = pacman_conf.read_text().splitlines()
-    if any(line.strip() == "[cachyos-v3]" for line in lines):
-        return
-
-    anchor = next((i for i, line in enumerate(lines) if line.strip() == "[core]"), None)
-    if anchor is None:
-        raise InstallError(f"No [core] section in {pacman_conf} to anchor the CachyOS repos against")
-
-    block = []
-    for repo in CACHYOS_REPOS:
-        generic = repo == "cachyos"
-        mirrorlist = "cachyos-mirrorlist" if generic else "cachyos-v3-mirrorlist"
-        if not (TARGET / "etc/pacman.d" / mirrorlist).exists():
-            raise InstallError(f"/etc/pacman.d/{mirrorlist} is missing from the target")
-        # Not cdn77 (CachyOS's default first mirror): it 404s on every
-        # filename containing '+', and pacman then drops it mid-transaction
-        # and falls through to mirrors serving stale payloads.
-        arch = "$arch" if generic else "$arch_v3"
-        block += [f"[{repo}]", "SigLevel = Optional TrustAll",
-                  f"Server = https://mirror.cachyos.org/repo/{arch}/$repo",
-                  f"Include = /etc/pacman.d/{mirrorlist}", ""]
-    lines[anchor:anchor] = block
-    pacman_conf.write_text("\n".join(lines) + "\n")
-
-
-def copy_skel(progress):
-    # pacstrap leaves a bare /etc/skel; copy the live session's own
-    # Caelestia-configured skel onto the target instead.
-    progress("Copying Caelestia configuration into /etc/skel")
-    target_skel = TARGET / "etc/skel"
-    target_skel.mkdir(parents=True, exist_ok=True)
-    _stream(["cp", "-a", "/etc/skel/.", f"{target_skel}/"], progress)
+    _chroot(["sh", "-c",
+             "pacman-key --add /etc/pacman.d/fenrir-signing-key.asc && "
+             f"pacman-key --lsign-key {FENRIR_REPO_KEY_FPR}"], progress)
 
 
 def genfstab_target(progress):
@@ -408,7 +306,6 @@ def configure_locale(timezone, locale, progress):
 
 KBD_MODEL_MAP = Path("/usr/share/systemd/kbd-model-map")
 SKEL_HYPR_VARS = "etc/skel/.config/caelestia/hypr-vars.lua"
-GREETER_LAYOUT_LUA = "etc/greetd/layout.lua"
 
 
 def _console_keymap(layout):
@@ -442,47 +339,33 @@ def configure_keyboard(layout, progress):
         "EndSection\n"
     )
 
-    # Hyprland ignores xorg.conf.d, so without this the desktop stays on "us".
-    # Written into skel because create_user's useradd -m copies it from there.
+    # Hyprland ignores xorg.conf.d; written into skel so useradd -m copies it.
     hypr_vars = TARGET / SKEL_HYPR_VARS
     hypr_vars.parent.mkdir(parents=True, exist_ok=True)
     hypr_vars.write_text('return {\n    kbLayout = "%s",\n}\n' % layout)
 
-    # The greeter is a separate user running its own bare Hyprland, so it
-    # needs the layout independently - otherwise the login screen is always
-    # us and anyone else mistypes their password with no clue why. Same shape
-    # as hypr-vars.lua above, since its Hyprland config is Lua too.
-    greeter_lua = TARGET / GREETER_LAYOUT_LUA
-    greeter_lua.parent.mkdir(parents=True, exist_ok=True)
-    greeter_lua.write_text('return {\n    kbLayout = "%s",\n}\n' % layout)
+
+AUTOLOGIN_SESSION = "hyprland.desktop"
 
 
-# The live image overlays /etc/greetd/config.toml with an autologin section
-# for liveuser; the package keeps an untouched copy here for the target.
-GREETER_PRISTINE_CONF = Path("/usr/share/fenrir-greeter/config.toml")
+def configure_autologin(username, progress):
+    # Boots straight into a session that fenrir-splash locks. Relogin=false: once
+    # per boot, so if the session ever ends sddm shows its normal greeter.
+    progress("Configuring automatic login")
+    conf_dir = TARGET / "etc/sddm.conf.d"
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    (conf_dir / "autologin.conf").write_text(
+        "[Autologin]\n"
+        f"User={username}\n"
+        f"Session={AUTOLOGIN_SESSION}\n"
+        "Relogin=false\n"
+    )
 
-
-def configure_greeter(progress):
-    # The clone copies the live config verbatim, autologin and all, which on a
-    # real machine would log anyone straight in as a user that no longer
-    # exists. Overwrite it rather than scrub it, so the target always ends up
-    # with a working greeter config.
-    target_conf = TARGET / "etc/greetd/config.toml"
-    if not GREETER_PRISTINE_CONF.exists():
-        progress("Skipping greeter config - fenrir-greeter is not installed")
-        return
-
-    progress("Configuring the login screen")
-    target_conf.parent.mkdir(parents=True, exist_ok=True)
-    target_conf.write_text(GREETER_PRISTINE_CONF.read_text())
-
-    # Point display-manager.service at greetd explicitly rather than trusting
-    # greetd.service to carry an Alias for it. sddm stays installed as the way
-    # back in: "systemctl enable --now sddm" from a TTY if the greeter fails.
+    # Set explicitly rather than trusting sddm.service to carry an Alias.
     dm = TARGET / "etc/systemd/system/display-manager.service"
     dm.parent.mkdir(parents=True, exist_ok=True)
     dm.unlink(missing_ok=True)
-    dm.symlink_to("/usr/lib/systemd/system/greetd.service")
+    dm.symlink_to("/usr/lib/systemd/system/sddm.service")
 
 
 def configure_hostname(hostname, progress):
@@ -495,8 +378,7 @@ def configure_hostname(hostname, progress):
     )
 
 
-# Matches the live session's liveuser groups (useradd -G wheel alone
-# misses these); added one at a time so a missing group doesn't fail the install.
+# Matches the live session's liveuser groups; useradd -G wheel alone misses these.
 USER_GROUPS = ("network", "power", "adm", "uucp", "optical", "rfkill", "video", "storage", "audio", "users")
 
 
@@ -506,14 +388,17 @@ def create_user(username, full_name, password, progress):
         ["useradd", "-m", "-G", "wheel", "-s", "/usr/bin/fish", "-c", full_name, username],
         progress,
     )
-    for group in USER_GROUPS:
-        proc = subprocess.run(
-            ["arch-chroot", str(TARGET), "usermod", "-aG", group, username],
-            capture_output=True,
-            text=True,
-        )
-        if proc.returncode != 0:
-            progress(f"Note: couldn't add {username} to group '{group}' (it may not exist on this install) - continuing")
+    # One usermod for the groups that exist, so a missing one can't fail the install.
+    existing = set()
+    group_file = TARGET / "etc/group"
+    if group_file.exists():
+        existing = {l.split(":", 1)[0] for l in group_file.read_text().splitlines() if ":" in l}
+    wanted = [g for g in USER_GROUPS if g in existing]
+    missing = [g for g in USER_GROUPS if g not in existing]
+    if missing:
+        progress(f"Note: groups not on this install, skipping: {', '.join(missing)}")
+    if wanted:
+        _chroot(["usermod", "-aG", ",".join(wanted), username], progress)
     for account in (username, "root"):
         proc = subprocess.run(
             ["arch-chroot", str(TARGET), "chpasswd"],
@@ -525,8 +410,7 @@ def create_user(username, full_name, password, progress):
 
 
 def configure_sudo(progress):
-    # wheel is commented out in Arch's default sudoers; drop in a file
-    # instead of editing it directly. sudo requires exactly 0440 to read it.
+    # Arch's sudoers has wheel commented out; sudo requires exactly 0440.
     progress("Enabling sudo for the wheel group")
     sudoers_wheel = TARGET / "etc/sudoers.d/wheel"
     sudoers_wheel.write_text("%wheel ALL=(ALL:ALL) ALL\n")
@@ -534,13 +418,8 @@ def configure_sudo(progress):
 
 
 def configure_polkit(progress):
-    # Clock and firewall changes from Nexus don't prompt: a local, active
-    # wheel user can already sudo anything, so this removes friction rather
-    # than a barrier. Only the three FirewallD actions the page actually
-    # uses are granted - .direct and .policies stay at auth_admin_keep.
-    # The systemd grant is scoped to firewalld.service; if systemd doesn't
-    # supply the "unit" detail the rule just won't match and the user gets
-    # the normal prompt, so it can never over-grant.
+    # Clock and firewall changes from Nexus skip the prompt for a local, active
+    # wheel user. The systemd grant is scoped to firewalld.service only.
     progress("Allowing clock and firewall changes without a password")
     rules_dir = TARGET / "etc/polkit-1/rules.d"
     rules_dir.mkdir(parents=True, exist_ok=True)
@@ -565,30 +444,15 @@ def configure_polkit(progress):
 
 
 def configure_plymouth(progress):
-    # The package is pacstrapped, but none of its config is - the theme,
-    # plymouthd.conf and the mkinitcpio hook all live in the live image's
-    # own airootfs, so an install gets Plymouth with nothing configured.
-    live_theme = Path("/usr/share/plymouth/themes/fenrir")
-    if not live_theme.is_dir():
+    # The theme and plymouthd.conf arrive with the clone; only the initramfs hook
+    # doesn't, since the live image's HOOKS live in the excluded archiso.conf.
+    if not (TARGET / "usr/share/plymouth/themes/fenrir").is_dir():
         progress("Skipping boot splash — theme missing from the live image")
         return
 
     progress("Setting up the boot splash")
-    target_theme = TARGET / "usr/share/plymouth/themes/fenrir"
-    target_theme.mkdir(parents=True, exist_ok=True)
-    _stream(["cp", "-a", f"{live_theme}/.", f"{target_theme}/"], progress)
-
-    plymouth_dir = TARGET / "etc/plymouth"
-    plymouth_dir.mkdir(parents=True, exist_ok=True)
-    (plymouth_dir / "plymouthd.conf").write_text("[Daemon]\nTheme=fenrir\n")
-
-    # Must happen before finalize_bootloader, which regenerates the
-    # initramfs - the hook has to be in HOOKS by then or the splash never
-    # makes it into the image.
-    # The hook goes after whichever initrd flavour is in use. mkinitcpio's
-    # current default is systemd-based and has no "udev" token at all, so
-    # anchoring only on udev silently did nothing and the splash never
-    # reached the installed system.
+    # Must precede finalize_bootloader, which regenerates the initramfs. Anchored
+    # on systemd or udev, since the default systemd-based HOOKS has no "udev".
     mkinitcpio_conf = TARGET / "etc/mkinitcpio.conf"
     lines = mkinitcpio_conf.read_text().splitlines()
     for i, line in enumerate(lines):
@@ -611,8 +475,8 @@ def configure_plymouth(progress):
 
 
 def configure_kernel_cmdline(root_part, progress):
-    # Without this, limine-entry-tool falls back to /proc/cmdline, which
-    # under arch-chroot is the live ISO's own boot params, not the target's.
+    # Otherwise limine-entry-tool reads /proc/cmdline, which under arch-chroot is
+    # the live ISO's boot params rather than the target's.
     progress("Writing kernel command line")
     uuid = subprocess.run(
         ["blkid", "-s", "UUID", "-o", "value", root_part],
@@ -631,16 +495,12 @@ BOOTLOADER_STAGE = "opt/fenrir-bootloader"
 
 
 def install_bootloader_packages(progress):
-    # limine is missing from the live image on purpose (see util-iso.sh), so
-    # the clone inherits that gap and limine-install would not exist. The
-    # package files ride along on the ISO instead; by now the target has a
-    # real ESP mounted, which is the thing their hooks need.
+    # limine is kept out of the live image (its hooks need a real ESP), so its
+    # packages ride along on the ISO and are installed once the ESP is mounted.
     stage = TARGET / BOOTLOADER_STAGE
     packages = sorted(stage.glob("*.pkg.tar.zst")) if stage.is_dir() else []
     if not packages:
-        # The pacstrap fallback path installs limine from the package list.
-        progress("No staged bootloader packages, assuming limine is installed")
-        return
+        raise InstallError(f"No bootloader packages staged in /{BOOTLOADER_STAGE}")
 
     progress("Installing the bootloader")
     _chroot(
@@ -651,16 +511,13 @@ def install_bootloader_packages(progress):
 
 
 def finalize_bootloader(progress):
-    # Registers the initial NVRAM boot entry for this fresh install.
     progress("Installing Limine")
     _chroot(["limine-install"], progress)
-    # limine-update writes each kernel's real boot entry into limine.conf;
-    # must run after limine-install or it gets clobbered back to a placeholder.
+    # limine-update writes the real per-kernel entries, so it must run last or
+    # limine-install clobbers them back to a placeholder.
     progress("Generating initramfs and Limine boot entries")
     _chroot(["limine-update"], progress)
 
-    # limine-install/update don't touch this setting; force it last so
-    # it isn't clobbered by either call.
     progress("Configuring Limine to boot straight to the desktop")
     limine_conf = TARGET / "boot/limine.conf"
     lines = limine_conf.read_text().splitlines()
@@ -669,27 +526,22 @@ def finalize_bootloader(progress):
     limine_conf.write_text("\n".join(lines) + "\n")
 
 
-ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "greetd", "firewalld")
+ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "sddm", "firewalld")
 
 
 def enable_services(progress):
-    for service in ENABLED_SERVICES:
-        progress(f"Enabling {service}")
-        _chroot(["systemctl", "enable", service], progress)
+    progress(f"Enabling {', '.join(ENABLED_SERVICES)}")
+    _chroot(["systemctl", "enable", *ENABLED_SERVICES], progress)
 
 
-# Dropped vs firewalld's stock public zone: ssh. sshd is enabled only on the
-# live ISO, never on an installed system, so port 22 would be pure attack
-# surface. The rest are the desktop cases that otherwise fail silently later -
-# printer/device discovery, casting, phone pairing, Steam Remote Play. Each is
-# inert until the matching app is actually installed and listening.
+# firewalld's stock public zone minus ssh (sshd only runs on the live ISO), plus
+# the desktop discovery services that would otherwise fail silently.
 DEFAULT_ZONE_SERVICES = ("dhcpv6-client", "mdns", "ssdp", "kdeconnect", "steam-streaming")
 
 
 def configure_firewall(progress):
-    # Written as a zone override in /etc/firewalld/zones, which firewalld
-    # reads in preference to /usr/lib/firewalld/zones - no daemon needed, so
-    # this works inside the chroot where firewall-cmd would not.
+    # A zone override in /etc/firewalld/zones needs no running daemon, so it
+    # works in the chroot where firewall-cmd would not.
     progress("Enabling firewall")
 
     conf = TARGET / "etc/firewalld/firewalld.conf"
@@ -721,8 +573,7 @@ def configure_firewall(progress):
 
 def unmount_target(progress):
     progress("Unmounting target")
-    # gpg-agent (from pacstrap's keyring setup) can outlive its chroot and
-    # keep the target busy; kill stragglers, then fall back to a lazy unmount.
+    # gpg-agent from pacman-key can outlive its chroot and keep the target busy.
     subprocess.run(
         ["fuser", "-km", str(TARGET)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
@@ -737,14 +588,13 @@ def run_install(plan: InstallPlan, progress):
     partition_and_mount(plan.disk, plan.esp_mib, progress)
     progress("Installing packages (this takes a while)")
     clone_live_rootfs(progress)
+    remove_live_only_packages(progress)
     initialize_keyring(progress)
     configure_fenrir_repo(progress)
-    configure_cachyos_repos(progress)
-    copy_skel(progress)
     genfstab_target(progress)
     configure_locale(plan.timezone, plan.locale, progress)
     configure_keyboard(plan.keyboard, progress)
-    configure_greeter(progress)
+    configure_autologin(plan.username, progress)
     configure_hostname(plan.hostname, progress)
     create_user(plan.username, plan.full_name, plan.password, progress)
     configure_sudo(progress)

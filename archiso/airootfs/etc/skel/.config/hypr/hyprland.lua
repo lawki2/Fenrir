@@ -1,0 +1,1 @@
+/usr/share/fenrir/hypr-loader.lua

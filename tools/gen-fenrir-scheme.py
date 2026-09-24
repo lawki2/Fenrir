@@ -3,15 +3,14 @@
 
 Mirrors what the dynamic scheme produces from the default wallpaper, but
 fixed and in dark mode: the seed is that wallpaper's dominant tone and the
-variant is the same "vibrant" dynamic uses, which keeps the deep red-browns
-rather than neutralising them. Rerun after changing SEED or VARIANT.
+variant is the same "vibrant" dynamic uses. Rerun after changing SEED or VARIANT.
 """
 
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-SEED = "906048"
+SEED = "6799dc"
 VARIANT = "vibrant"
 OUT = Path(__file__).resolve().parent.parent / "assets/schemes/fenrir/default"
 

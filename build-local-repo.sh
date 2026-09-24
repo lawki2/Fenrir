@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Builds the AUR-only packages Fenrir needs (Caelestia + its uncommon deps)
-# into a local pacman repo, so the archiso build never needs AUR/makepkg
-# access at ISO-build time. Run this once (or whenever these packages need
-# updating), before ./buildiso.sh.
+# Builds the AUR and Fenrir packages into local-repo/, so the ISO build never
+# needs AUR access. Run before ./buildiso.sh.
 set -euo pipefail
 
 src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,9 +12,8 @@ repo_name="fenrir-local"
 mkdir -p "$work_dir" "$repo_dir"
 
 # Packages with no interdependencies among themselves, build first.
-independent_aur_pkgs=(qtengine app2unit python-materialyoucolor libcava ttf-rubik-vf zen-browser-bin qt6-m3shapes-git)
-# Depends on packages built in the previous stage.
-caelestia_aur_pkgs=(caelestia-cli caelestia-shell)
+# zen-browser-bin is not here: [cachyos] carries it, and the ISO takes it from there.
+independent_aur_pkgs=(qtengine app2unit python-materialyoucolor libcava ttf-rubik-vf qt6-m3shapes-git)
 
 # Pin to known-good commits — an unpinned clone once silently broke
 # fenrir-nexus-patches/Toggles.qml on a version bump. Bump deliberately.
@@ -25,13 +22,21 @@ declare -A pinned_aur_commits=(
     [caelestia-shell]="e43db3eb47e45935d9c71b7f1b41817c85aa2bcb" # 2.4.0
 )
 
-# Bump when a package must be rebuilt against updated deps (a Qt/quickshell
-# rebuild, say) with no upstream version change. Appends to pkgrel, so
-# 2.3.0-1 becomes 2.3.0-1.1 and pacman sees it as newer.
+# Fenrir files spliced into these AUR packages at build time; a change rebuilds them.
+declare -A spliced_inputs=(
+    [caelestia-shell]="fenrir-nexus-patches assets/wallpaper.webp"
+    [caelestia-cli]="assets/schemes/fenrir"
+)
+
+# Bump to rebuild against updated deps at an unchanged upstream version; it is
+# appended to pkgrel, so 2.3.0-1 becomes 2.3.0-1.1 and pacman sees it as newer.
 declare -A fenrir_rebuild=(
     [caelestia-cli]=1
-    [caelestia-shell]=7
+    [caelestia-shell]=8
 )
+
+# Fenrir's own packages whose pkgver is the build time, so each rebuild reaches -Syu as an update.
+stamped_pkgs=(fenrir-settings fenrir-splash fenrir-welcome)
 
 repo_db="${repo_dir}/${repo_name}.db.tar.gz"
 
@@ -85,36 +90,28 @@ build_one() {
     fi
 
     if [[ -n "$existing" ]]; then
-        if [[ "$pkg" == "caelestia-shell" ]]; then
-            # caelestia-shell splices in fenrir-nexus-patches/ and the
-            # wallpaper at build time, so check those for staleness too.
-            if [[ -z "$(find "$src_dir/fenrir-nexus-patches" "$src_dir/assets/wallpaper.webp" -type f -newer "$existing" 2>/dev/null)" ]]; then
-                echo "==> $pkg already built and up to date, skipping"
-                return
-            fi
-            echo "==> $pkg's Nexus overlay or wallpaper changed since last build, rebuilding"
-            rm -f "$repo_dir/${pkg}"-*.pkg.tar.zst
-        elif [[ "$src" == "aur" ]]; then
+        # Rebuild only when something that goes into the package is newer than it.
+        local -a inputs=()
+        if [[ "$src" != "aur" ]]; then
+            inputs=("$src")
+        elif [[ -n "${spliced_inputs[$pkg]:-}" ]]; then
+            for rel in ${spliced_inputs[$pkg]}; do inputs+=("$src_dir/$rel"); done
+        else
             echo "==> $pkg already built, skipping (delete $repo_dir/${pkg}-*.pkg.tar.zst to rebuild)"
             return
-        else
-            # Local packages have a real source tree to diff against;
-            # a stale binary shipped silently three times before this check.
-            if [[ -z "$(find "$src" -type f -newer "$existing" 2>/dev/null)" ]]; then
-                echo "==> $pkg already built and up to date, skipping"
-                return
-            fi
-            echo "==> $pkg source changed since last build, rebuilding"
-            rm -f "$repo_dir/${pkg}"-*.pkg.tar.zst
         fi
+        if [[ -z "$(find "${inputs[@]}" -type f -newer "$existing" 2>/dev/null)" ]]; then
+            echo "==> $pkg already built and up to date, skipping"
+            return
+        fi
+        echo "==> $pkg inputs changed since last build, rebuilding"
+        rm -f "$repo_dir/${pkg}"-*.pkg.tar.zst
     fi
 
     rm -rf "$build_root"
     if [[ "$src" == "aur" ]]; then
         if [[ -n "${pinned_aur_commits[$pkg]:-}" ]]; then
-            # Pinned packages need full history to check out an arbitrary
-            # older commit - these repos are tiny (a PKGBUILD + a patch or
-            # two), so the extra clone cost is negligible.
+            # A pinned commit needs full history; these repos are a few KB.
             git clone "https://aur.archlinux.org/${pkg}.git" "$build_root"
             git -C "$build_root" checkout "${pinned_aur_commits[$pkg]}"
         else
@@ -129,16 +126,20 @@ build_one() {
         sed -i -E "s/^pkgrel=([0-9]+(\.[0-9]+)*)\$/pkgrel=\1.${rebuild}/" "$build_root/PKGBUILD"
     fi
 
+    if [[ " ${stamped_pkgs[*]} " == *" $pkg "* ]]; then
+        sed -i "s/^pkgver=.*/pkgver=$(date +%Y.%m.%d.%H%M)/" "$build_root/PKGBUILD"
+    fi
+
     if [[ "$pkg" == "caelestia-cli" ]]; then
-        # Ships Fenrir's own colour scheme alongside the built-in ones, so it
-        # shows up in the scheme picker and not just in skel's scheme.json.
+        # Ships the Fenrir scheme into the picker. Copied *into* schemes/: a glob only
+        # expands over paths that exist, so it can't end at the new fenrir/ dir.
         if ! grep -qF 'python -m installer --destdir' "$build_root/PKGBUILD"; then
             echo "==> caelestia-cli's PKGBUILD no longer has the expected installer" \
                 "line - the Fenrir scheme splice needs updating." >&2
             exit 1
         fi
-        cp -r "$src_dir/assets/schemes/fenrir" "$build_root/fenrir-scheme"
-        sed -i '/python -m installer --destdir/a\    cp -r "$startdir/fenrir-scheme" "$pkgdir"/usr/lib/python*/site-packages/caelestia/data/schemes/fenrir' \
+        cp -r "$src_dir/assets/schemes/fenrir" "$build_root/fenrir"
+        sed -i '/python -m installer --destdir/a\    cp -r "$startdir/fenrir" "$pkgdir"/usr/lib/python*/site-packages/caelestia/data/schemes/' \
             "$build_root/PKGBUILD"
     fi
 
@@ -146,6 +147,14 @@ build_one() {
         # CachyOS's quickshell-git is a stale snapshot predating "DefaultEnv"
         # pragma support that shell.qml requires; build against quickshell instead.
         sed -i "s/'quickshell-git'/'quickshell'/" "$build_root/PKGBUILD"
+
+        # Pulls fenrir-settings into existing installs, which only -Syu what they already have.
+        if ! grep -q '^depends=($' "$build_root/PKGBUILD"; then
+            echo "==> caelestia-shell's PKGBUILD no longer opens depends=( on its own line -" \
+                "the fenrir-settings dependency splice needs updating." >&2
+            exit 1
+        fi
+        sed -i "s/^depends=($/depends=(\n    'fenrir-settings'/" "$build_root/PKGBUILD"
 
         # sed's `a` is a silent no-op if this anchor line ever changes,
         # which would ship a broken ISO with zero build-log error.
@@ -189,9 +198,12 @@ for pkg in "${independent_aur_pkgs[@]}"; do
     build_one "$pkg" aur
 done
 
-for pkg in "${caelestia_aur_pkgs[@]}"; do
-    build_one "$pkg" aur
-done
+# The chroot installs each package's depends before building it, so this order matters:
+# fenrir-welcome needs caelestia-cli, fenrir-settings needs fenrir-welcome, caelestia-shell needs fenrir-settings.
+build_one caelestia-cli aur
+build_one "fenrir-welcome" "$src_dir/fenrir-welcome"
+build_one "fenrir-settings" "$src_dir/fenrir-settings"
+build_one caelestia-shell aur
 
 # Not on AUR; built from ~/caelestia, cloned once and never auto-pulled —
 # same pin-deliberately policy as pinned_aur_commits above.
@@ -202,7 +214,7 @@ build_one "caelestia-meta" "$HOME/caelestia"
 
 # Fenrir's own packages, not on AUR; their PKGBUILDs live in this repo.
 build_one "fenrir-installer" "$src_dir/fenrir-installer"
-build_one "fenrir-greeter" "$src_dir/fenrir-greeter"
+build_one "fenrir-splash" "$src_dir/fenrir-splash"
 
 echo "==> Done. Built packages are in $repo_dir"
 ls -1 "$repo_dir"/*.pkg.tar.zst

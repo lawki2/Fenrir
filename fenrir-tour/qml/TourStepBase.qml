@@ -3,10 +3,8 @@ import QtQuick.Layouts
 import Caelestia.Config
 import qs.services
 
-// Shared visual template for each tour step — pages/Tour*.qml files are
-// just this with stepTitle/body overridden, so they ARE a TourStepBase at
-// the root (not wrapping one), meaning shell.qml's Connections can listen
-// for "next" directly without any signal-forwarding boilerplate per step.
+// Template for each tour step; the Tour*.qml files override stepTitle and body,
+// so a host can listen for "next" on the step itself.
 Item {
     id: root
 

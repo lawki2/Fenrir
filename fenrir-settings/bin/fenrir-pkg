@@ -1,0 +1,58 @@
+#!/bin/sh
+# Root side of Settings > Updates and the welcome window's extras; only knows the jobs below.
+# Jobs run in their own session, logged to /run/fenrir-pkg, so a shell reload can't kill pacman.
+set -eu
+
+# bundle: the packages it installs, or "chwd" for hardware detection
+bundles() {
+    cat <<'EOF'
+gaming cachyos-gaming-applications
+flatpak flatpak
+printers gutenprint hplip foomatic-db foomatic-db-engine foomatic-db-ppds
+codecs gst-plugins-bad gst-plugins-ugly gst-libav
+devtools base-devel
+graphics chwd
+EOF
+}
+
+case "${1:-}" in
+    list)
+        bundles
+        exit 0
+        ;;
+    update)
+        job="update"
+        cmd="pacman -Syu --noconfirm --noprogressbar"
+        ;;
+    install)
+        pkgs="$(bundles | awk -v b="${2:-}" '$1 == b { $1 = ""; print }')"
+        [ -n "$pkgs" ] || { echo "Unknown extra: ${2:-}" >&2; exit 2; }
+        job="install ${2}"
+        if [ "$pkgs" = " chwd" ]; then
+            cmd="chwd -a"
+        else
+            cmd="pacman -S --needed --noconfirm --noprogressbar$pkgs"
+        fi
+        ;;
+    *)
+        echo "usage: $0 list | update | install <extra>" >&2
+        exit 2
+        ;;
+esac
+
+dir=/run/fenrir-pkg
+mkdir -p "$dir"
+chmod 755 "$dir"
+
+# /run is cleared on boot; a stale "running" only survives if the job itself died.
+if [ "$(cat "$dir/state" 2>/dev/null)" = running ] && [ -d "/proc/$(cat "$dir/pid" 2>/dev/null)" ]; then
+    echo "Another install is already running" >&2
+    exit 1
+fi
+
+echo "$job" > "$dir/job"
+echo running > "$dir/state"
+: > "$dir/log"
+setsid -f sh -c 'echo $$ > /run/fenrir-pkg/pid
+    '"$cmd"' > /run/fenrir-pkg/log 2>&1
+    echo $? > /run/fenrir-pkg/state'

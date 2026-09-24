@@ -7,10 +7,8 @@ import qs.components
 import qs.components.containers
 import qs.services
 
-// Caelestia's Nexus PageBase minus NexusState: same header, same capped
-// content width, same fading flickable, so installer pages and settings
-// pages are laid out identically. The installer has its own navigation, so
-// the sub-page back button is dropped.
+// Nexus's PageBase without NexusState or the back button, so installer and
+// settings pages lay out identically.
 ColumnLayout {
     id: root
 
@@ -24,23 +22,34 @@ ColumnLayout {
 
     spacing: Tokens.spacing.extraLargeIncreased
 
-    ColumnLayout {
-        spacing: Tokens.spacing.extraSmall
+    // Centred over the content column. Anchored in an Item because
+    // Layout.alignment on the column itself does not centre it here.
+    Item {
+        Layout.fillWidth: true
+        implicitHeight: header.implicitHeight
 
-        StyledText {
-            Layout.fillWidth: true
-            text: root.title
-            font: Tokens.font.title.large
-            elide: Text.ElideRight
-        }
+        ColumnLayout {
+            id: header
 
-        StyledText {
-            Layout.fillWidth: true
-            visible: root.subtitle.length > 0
-            text: root.subtitle
-            color: Colours.palette.m3outline
-            font: Tokens.font.body.medium
-            wrapMode: Text.WordWrap
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: root.cappedWidth
+            spacing: Tokens.spacing.extraSmall
+
+            StyledText {
+                Layout.fillWidth: true
+                text: root.title
+                font: Tokens.font.title.large
+                elide: Text.ElideRight
+            }
+
+            StyledText {
+                Layout.fillWidth: true
+                visible: root.subtitle.length > 0
+                text: root.subtitle
+                color: Colours.palette.m3outline
+                font: Tokens.font.body.medium
+                wrapMode: Text.WordWrap
+            }
         }
     }
 

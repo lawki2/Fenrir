@@ -5,11 +5,8 @@ import Quickshell
 import Quickshell.Io
 import Caelestia.Config
 
-// Reads Caelestia's live scheme the same way its own shell does, and exposes
-// the same API surface (palette/tPalette/layer/light) so Caelestia's real
-// components work here unmodified. It is NOT Caelestia's Colours: that one
-// pulls in the Hypr and Wallpapers services, and the installer runs as root
-// via pkexec without HYPRLAND_INSTANCE_SIGNATURE, so those would fail.
+// Caelestia's Colours API for its real components. Not the real service: that needs
+// Hyprland IPC, which the installer lacks running as root via pkexec.
 Singleton {
     id: root
 
@@ -138,10 +135,8 @@ Singleton {
 
     readonly property Palette palette: Palette {}
     readonly property TPalette tPalette: TPalette {}
-    // Read from Tokens, the same source Caelestia's own Colours uses, so the
-    // installer is exactly as transparent as the desktop - no invented alpha.
-    // Config.appearance would warn here: it is screen-scoped and a singleton
-    // has no screen. The light-mode nudge mirrors Caelestia's Transparency.
+    // Same source as Caelestia's Colours, so it matches the desktop's transparency.
+    // Not Config.appearance: that is screen-scoped, and a singleton has no screen.
     readonly property Transparency transparency: Transparency {}
 
     component Transparency: QtObject {

@@ -2,11 +2,8 @@ pragma Singleton
 
 import QtQuick
 
-// Shared state for the full-page option picker (shell.qml renders the actual
-// overlay). Options are {label, value} pairs so the list can show a readable
-// name while the page keeps the raw code. A singleton because the rows that
-// open it live inside per-page QML files loaded via Loader, which can't reach
-// back up to shell.qml's ids directly.
+// State for the picker overlay in shell.qml; options are {label, value}. A
+// singleton because Loader'd pages can't reach shell.qml's ids.
 QtObject {
     id: root
 

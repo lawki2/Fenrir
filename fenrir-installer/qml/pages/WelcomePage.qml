@@ -7,13 +7,10 @@ import qs.components
 import qs.components.controls
 import qs.services
 
-// No tour here any more: teaching a tiling WM while someone is trying to get
-// through an installer is the wrong moment. That content moved to
-// fenrir-tour/, to become the first-boot tutorial.
 Item {
     id: root
 
-    signal skip
+    signal next
 
     ColumnLayout {
         anchors.centerIn: parent
@@ -47,7 +44,7 @@ Item {
             inactiveOnColour: Colours.palette.m3onPrimary
             implicitWidth: startLabel.implicitWidth + Tokens.padding.extraLarge * 2
             implicitHeight: startLabel.implicitHeight + Tokens.padding.large * 2
-            onClicked: root.skip()
+            onClicked: root.next()
 
             StyledText {
                 id: startLabel

@@ -7,10 +7,7 @@ import qs.services
 import qs.modules.nexus.common
 import qs.common
 
-// Built from the same Nexus rows the settings app uses, so setting up an
-// account here looks like changing a setting later. Validation is shown
-// per-field via TextFieldRow's own errorText rather than one paragraph of
-// rules at the bottom.
+// Nexus rows, so creating the account looks like editing a setting later.
 InstallerPage {
     id: root
 
@@ -40,6 +37,8 @@ InstallerPage {
     }
 
     ColumnLayout {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 

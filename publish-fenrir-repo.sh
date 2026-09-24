@@ -1,32 +1,16 @@
 #!/usr/bin/env bash
-# Signs caelestia-cli/caelestia-shell out of local-repo/ (built by
-# build-local-repo.sh) and publishes them + a signed repo database to the
-# gh-pages branch of https://github.com/lawki2/Fenrir, which GitHub Pages
-# serves as the [fenrir] repo installed systems point at (see
-# archiso/airootfs/etc/pacman.d/fenrir-mirrorlist and
-# fenrir-installer/lib/backend.py's configure_fenrir_repo()).
-#
-# Run manually, after build-local-repo.sh has produced fresh packages,
-# whenever you actually want to publish a new caelestia-shell/-cli build.
-# Unlike build-local-repo.sh this pushes to a public branch and needs the
-# Fenrir project signing key - deliberately not wired into
-# build-local-repo.sh's or buildiso.sh's automatic flow.
-# Not -u: util.sh's load_vars() uses indirect expansion (${!var}) on
-# makepkg.conf variables that are typically never set at all (SRCDEST,
-# PACKAGER, etc.) - harmless under normal bash (expands empty), but fatal
-# under nounset. buildiso.sh, which sources the same util.sh, avoids this
-# the same way: plain set -e, no -u.
+# Signs packages from local-repo/ and publishes them to the gh-pages branch that
+# serves the [fenrir] repo. Manual on purpose: it pushes publicly and needs the key.
+
+# Not -u: util.sh's load_vars() expands makepkg.conf vars that are usually unset.
 set -eo pipefail
 
 src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -r ${src_dir}/util-msg.sh ]] && source ${src_dir}/util-msg.sh
 import ${src_dir}/util.sh
 
-# Project-local, gitignored signing setup (never the maintainer's personal
-# ~/.gnupg) - see secrets/ in the one-time setup checklist. Exporting
-# GPGKEY/GNUPGHOME here before sign_with_key()'s own load_vars() runs
-# means they take precedence over anything in ~/.makepkg.conf, per
-# load_vars()'s "only set if not already set" logic.
+# The project's own gitignored keyring, never ~/.gnupg. Exported before load_vars()
+# runs, so it wins over ~/.makepkg.conf.
 secrets_dir="${src_dir}/secrets"
 [[ -f "${secrets_dir}/publish.env" ]] && source "${secrets_dir}/publish.env"
 
@@ -37,11 +21,10 @@ repo_name="fenrir"
 gh_pages_url="https://github.com/lawki2/Fenrir.git"
 gh_pages_branch="gh-pages"
 
-# The Caelestia stack plus its AUR-only deps - all tiny, and without them an
-# installed system can't resolve a new dep (2.4.0 added qt6-m3shapes-git).
-# Excludes fenrir-installer (live-only) and zen-browser-bin (126MB, not a dep).
+# The Caelestia stack plus its AUR-only deps, so an update can resolve a new one, and
+# Fenrir's own installed packages. Not fenrir-installer, which only runs on the live ISO.
 published_pkgs=(
-    caelestia-cli caelestia-shell
+    caelestia-cli caelestia-shell fenrir-settings fenrir-splash fenrir-welcome
     qt6-m3shapes-git qtengine app2unit python-materialyoucolor libcava ttf-rubik-vf
 )
 
@@ -79,9 +62,7 @@ if ! git clone --branch "$gh_pages_branch" --single-branch "$gh_pages_url" "$clo
     git -C "$clone_dir" remote add origin "$gh_pages_url"
     git -C "$clone_dir" checkout --orphan "$gh_pages_branch"
 fi
-# GitHub Pages runs Jekyll by default, which ignores/mangles paths
-# starting with an underscore and can interfere with serving a raw binary
-# tree - .nojekyll disables that. Only matters on first publish.
+# Stop GitHub Pages running Jekyll over a raw binary tree.
 touch "$clone_dir/.nojekyll"
 rm -rf "${clone_dir:?}/$arch"
 cp -r "$publish_dir/$arch" "$clone_dir/$arch"

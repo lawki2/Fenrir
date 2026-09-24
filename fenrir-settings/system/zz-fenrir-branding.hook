@@ -1,0 +1,15 @@
+# Named to sort after cachyos-hooks' os-release, lsb-release and cachyos-branding hooks,
+# which rename the system to CachyOS whenever these packages change.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+Target = lsb-release
+Target = cachyos-hooks
+Target = fenrir-settings
+
+[Action]
+Description = Naming the system Fenrir in os-release and lsb-release...
+When = PostTransaction
+Exec = /usr/lib/fenrir/fenrir-branding

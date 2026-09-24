@@ -36,16 +36,9 @@ StyledRect {
             return true;
         });
     }
-    // Row 1 always carries one extra, permanent sibling beyond these
-    // dynamic entries (the hardcoded night-light Toggle below), so its
-    // real capacity for *dynamic* toggles is one less than row 2's - cap
-    // splitIndex at 5 dynamic entries (+ night-light = 6 total) instead of
-    // evenly halving, and trigger the second row one entry sooner to
-    // match. Without this, the default 6-toggle config (wifi/bluetooth/
-    // mic/settings/gameMode/dnd) put all 6 plus night-light - 7 buttons -
-    // into a single row sized for 6.
-    readonly property int splitIndex: Math.min(5, quickToggles.length)
-    readonly property bool needExtraRow: quickToggles.length > 5
+    // Fenrir: a full first row, then the rest at the same button width (see extra row).
+    readonly property int perRow: 6
+    readonly property bool needExtraRow: quickToggles.length > perRow
 
     implicitHeight: layout.implicitHeight + Tokens.padding.extraLargeIncreased
 
@@ -65,39 +58,23 @@ StyledRect {
         }
 
         QuickToggleRow {
-            model: root.needExtraRow ? root.quickToggles.slice(0, root.splitIndex) : root.quickToggles
-
-            // Fenrir addition: a plain hardcoded sibling alongside the
-            // Repeater above, deliberately *not* going through
-            // Config.utilities.quickToggles - sidesteps needing to track
-            // that type's exact shape (which already changed once between
-            // caelestia-shell 2.2.0 and 2.3.0, see
-            // fenrir_design_guidelines.md) and shows up with zero user
-            // config needed. Two earlier attempts at a standalone row for
-            // just this one button (overriding fillWidth, then overriding
-            // implicitHeight to match a sibling row) both still came out
-            // sized wrong - ButtonRow evidently sizes each fillWidth
-            // sibling as a function of the *row's* child count, not a
-            // fixed/implicit per-button size, so no per-instance override
-            // in an isolated row can match it. Being a genuine sibling
-            // here, sharing the exact same row and child count as the
-            // other real toggles, is what actually guarantees identical
-            // sizing - no override needed at all.
-            Toggle {
-                icon: "nightlight"
-                checked: NightLight.enabled
-                onClicked: NightLight.enabled = !NightLight.enabled
-            }
+            model: root.needExtraRow ? root.quickToggles.slice(0, root.perRow) : root.quickToggles
         }
 
         QuickToggleRow {
+            // ButtonRow splits its own width evenly, so it gets only its share of a full row.
+            readonly property real slot: (layout.width - (root.perRow - 1) * spacing) / root.perRow
+
             visible: root.needExtraRow
-            model: root.needExtraRow ? root.quickToggles.slice(root.splitIndex) : []
+            Layout.fillWidth: false
+            Layout.preferredWidth: count * slot + (count - 1) * spacing
+            model: root.needExtraRow ? root.quickToggles.slice(root.perRow) : []
         }
     }
 
     component QuickToggleRow: ButtonRow {
         property alias model: repeater.model
+        readonly property alias count: repeater.count
 
         Layout.fillWidth: true
         spacing: Tokens.spacing.small
@@ -158,6 +135,14 @@ StyledRect {
                         icon: "gamepad"
                         checked: GameMode.enabled
                         onClicked: GameMode.enabled = !GameMode.enabled
+                    }
+                }
+                DelegateChoice {
+                    roleValue: "nightLight"
+                    delegate: Toggle {
+                        icon: "nightlight"
+                        checked: NightLight.enabled
+                        onClicked: NightLight.enabled = !NightLight.enabled
                     }
                 }
                 DelegateChoice {

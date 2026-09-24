@@ -1,0 +1,46 @@
+# Printing: .local names through avahi, and the services it needs.
+setup_printing() {
+    if ! grep -q '^hosts:.*mdns_minimal' /etc/nsswitch.conf; then
+        sed -i '/^hosts:/s/ resolve / mdns_minimal [NOTFOUND=return] resolve /' /etc/nsswitch.conf
+        grep -q '^hosts:.*mdns_minimal' /etc/nsswitch.conf \
+            || echo "fenrir-settings: add 'mdns_minimal [NOTFOUND=return]' to the hosts line in /etc/nsswitch.conf for network printers"
+    fi
+    systemctl enable --now avahi-daemon.service cups.socket 2>/dev/null || true
+    systemctl try-restart systemd-resolved.service 2>/dev/null || true
+}
+
+# Installs from before this package kept a frozen copy of the dotfiles in every home.
+migrate_homes() {
+    skel=/etc/skel
+    if [ -L "$skel/.config/hypr" ]; then
+        rm -f "$skel/.config/hypr" "$skel/.config/fish" "$skel/.config/foot" "$skel/.config/fastfetch" "$skel/.config/starship.toml"
+        for app in btop uwsm; do
+            if [ -L "$skel/.config/$app" ]; then
+                rm "$skel/.config/$app"
+                cp -r "$skel/.local/share/caelestia/$app" "$skel/.config/$app"
+            fi
+        done
+        mkdir -p "$skel/.config/hypr"
+        ln -s /usr/share/fenrir/hypr-loader.lua "$skel/.config/hypr/hyprland.lua"
+        rm -rf "$skel/.local/share/caelestia"
+    fi
+
+    # As each user, so nothing in a home can steer root's file operations.
+    getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $6 ~ /^\/home\// { print $1 ":" $6 }' |
+        while IFS=: read -r user home; do
+            [ -d "$home" ] || continue
+            runuser -u "$user" -- env HOME="$home" /usr/lib/fenrir/fenrir-migrate-home \
+                || echo "fenrir-settings: couldn't move $home to the shipped config; it keeps its old copy"
+        done
+}
+
+post_install() {
+    # Keeps firmware update info current for Settings > Updates.
+    systemctl enable --now fwupd-refresh.timer 2>/dev/null || true
+    setup_printing
+    migrate_homes
+}
+
+post_upgrade() {
+    post_install
+}

@@ -11,13 +11,8 @@ import qs.components.controls
 import qs.services
 import qs.modules.nexus.common
 
-// firewall-cmd and systemctl both talk D-Bus as the calling user, so nothing
-// here goes through pkexec - polkit gates the D-Bus call itself, and
-// backend.py's configure_polkit() grants the actions this page uses to local
-// active wheel users, so none of it prompts.
-//
-// Reads are one --list-all (services and ports in a single call); writes are
-// --permanent so they survive a reboot, then --reload to apply them live.
+// firewall-cmd talks D-Bus as the user; polkit gates it (see configure_polkit()).
+// Writes are --permanent, then --reload to apply them live.
 PageBase {
     id: root
 
@@ -33,9 +28,7 @@ PageBase {
     property var ports: []
     property string newPortSpec: ""
 
-    // No synthetic "default policy" row: in firewalld a zone's services and
-    // ports *are* its rules, and the block-incoming part is the zone target,
-    // which the toggle above already represents.
+    // No "default policy" row: blocking incoming is the zone target, i.e. the toggle.
     readonly property var allRows: [
         ...root.services.map(s => ({
                     kind: "service",
@@ -53,9 +46,7 @@ PageBase {
                 }))
     ]
 
-    // Every firewall-cmd run is a separate D-Bus call and so a separate
-    // polkit check - --list-all covers services and ports in one, keeping
-    // this to two calls instead of four.
+    // --list-all gets services and ports in one D-Bus call.
     function refresh(): void {
         root.loading = true;
         root.loadError = "";
@@ -74,10 +65,8 @@ PageBase {
         root.ports = split(fields.ports);
     }
 
-    // Permanent config only becomes live on reload, so every change chains
-    // into one - anything else silently wouldn't take effect until reboot.
-    // args stays `var` so it's a plain JS array - spreading a QML
-    // list<string> through the proxy is not reliable.
+    // Every change chains into a reload, or it wouldn't apply until reboot. args
+    // is `var` because spreading a QML list<string> through the proxy is unreliable.
     function applyChange(args: var): void {
         if (changeProc.running || reloadProc.running)
             return;
@@ -119,12 +108,8 @@ PageBase {
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 
-        // PageBase's default property is a single Item, so every non-Item
-        // lives in here rather than directly under PageBase.
-        //
-        // Control flow hangs off onExited, which always has the exit code;
-        // stdout/stderr text is stashed in properties and read reactively,
-        // because streamFinished and exited can arrive in either order.
+        // Non-Items live here: PageBase's default property takes a single Item. Logic
+        // hangs off onExited, since streamFinished and exited arrive in either order.
         Process {
             id: toggleProc
 

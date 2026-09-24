@@ -9,21 +9,8 @@ import qs.components
 import qs.services
 import qs.modules.nexus.common
 
-// Rebinds the ~1/3 of Fenrir's default Hyprland keybinds that already go
-// through variables.lua's vars.kbXxx indirection (see keybinds.lua) - the
-// existing hypr-vars.lua override mechanism upstream Caelestia already
-// ships (hyprland.lua merges it into `vars` before keybinds.lua runs)
-// already makes every entry below rebindable with zero changes to any
-// vendored file, so this page just reads/writes that one small file and
-// triggers a reload. The manifest's `default` values mirror
-// variables.lua's real current defaults - kept in sync by hand, since Lua
-// and QML are separate runtimes with no shared source of truth here.
-//
-// Deliberately not covered: the ~2/3 of binds that are still hardcoded
-// literals in keybinds.lua (mostly hardware keys, mouse-drag binds with no
-// sane rebind UX, and anything not judged worth exposing), and the
-// workspace-loop binds are exposed as their one shared modifier (rebinding
-// per-workspace-number isn't a sane granularity anyone actually wants).
+// Rebinds the keybinds that go through variables.lua's vars.kbXxx, by writing
+// hypr-vars.lua overrides. `default` values mirror variables.lua by hand.
 PageBase {
     id: root
 
@@ -256,6 +243,12 @@ PageBase {
             category: qsTr("Misc"),
             label: qsTr("Lock screen"),
             default: "SUPER + L"
+        },
+        {
+            id: "kbSwitchLayout",
+            category: qsTr("Misc"),
+            label: qsTr("Switch keyboard layout"),
+            default: "CTRL + space"
         }
     ]
 
@@ -270,9 +263,7 @@ PageBase {
         return root.manifest.some(other => other.id !== entry.id && root.currentValue(other) === value);
     }
 
-    // hypr-vars.lua is always a flat `return { key = "value", ... }`
-    // table (the shape upstream Caelestia itself generates/expects) - not
-    // a general Lua parser, just enough for this one known-simple format.
+    // hypr-vars.lua is a flat `return { key = "value", ... }`; not a Lua parser.
     function parseHyprVars(text: string): var {
         const result = {};
         const re = /(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
@@ -315,14 +306,7 @@ PageBase {
 
             path: `${Quickshell.env("HOME")}/.config/caelestia/hypr-vars.lua`
             printErrors: false
-            // Component.onCompleted below also calls loadOverrides()
-            // eagerly, but if this FileView's initial read is actually
-            // asynchronous (as onLoadFailed existing at all implies it
-            // can be), that call would run against empty/stale text with
-            // nothing to re-trigger it once the real content lands -
-            // matching services/Colours.qml's own onLoaded-driven load()
-            // call fixes that; re-running loadOverrides() here is a
-            // harmless no-op if the eager call already had the real text.
+            // The first read can be async, so reload once the text actually lands.
             onLoaded: root.loadOverrides()
             onLoadFailed: error => {
                 if (error === FileViewError.FileNotFound)
@@ -366,19 +350,6 @@ PageBase {
                     onChanged: newValue => root.rebind(group.modelData.id, newValue)
                 }
             }
-        }
-
-        SectionHeader {
-            text: qsTr("Keyboard layout")
-        }
-
-        NavRow {
-            first: true
-            last: true
-            icon: "keyboard"
-            text: qsTr("Switch layout")
-            subtext: qsTr("Cycles through the layouts set in System settings")
-            onClicked: root.nState.openSubPage(1)
         }
     }
 }

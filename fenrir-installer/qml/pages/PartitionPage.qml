@@ -10,9 +10,8 @@ import qs.services
 import qs.modules.nexus.common
 import qs.common
 
-// The disks are a list you pick from rather than a dropdown, because this is
-// the one irreversible choice in the installer and it should be visible at a
-// glance which disk is selected and how big it is.
+// A list rather than a dropdown: the one irreversible choice should show the
+// selected disk and its size at a glance.
 InstallerPage {
     id: root
 
@@ -41,6 +40,8 @@ InstallerPage {
     }
 
     ColumnLayout {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 

@@ -1,4 +1,3 @@
-alacritty
 alsa-utils
 amd-ucode
 arch-install-scripts
@@ -43,10 +42,7 @@ espeak-ng
 ethtool
 exfatprogs
 f2fs-tools
-fakeroot
 fatresize
-firefox
-gcc
 gpart
 gparted
 gptfdisk
@@ -71,9 +67,6 @@ lftp
 libfido2
 libusb-compat
 linux-atm
-linux-cachyos-lts
-linux-cachyos-lts-zfs
-linux-cachyos-lts-nvidia-open
 linux-cachyos
 linux-cachyos-nvidia-open
 linux-cachyos-zfs
@@ -111,7 +104,6 @@ ntfs-3g
 ntp
 nvidia-utils
 nvme-cli
-occt
 open-iscsi
 open-vm-tools
 opendesktop-fonts
@@ -183,7 +175,7 @@ qt6-wayland
 xdg-desktop-portal-hyprland
 xdg-desktop-portal-gtk
 hyprpicker
-wlsunset
+hyprsunset
 wl-clipboard
 cliphist
 trash-cli
@@ -200,8 +192,16 @@ ttf-jetbrains-mono-nerd
 polkit-gnome
 gnome-keyring
 thunar
+# Removable drives, phones (MTP) and network shares in Thunar's sidebar.
+udisks2
+gvfs
+gvfs-mtp
+gvfs-smb
 quickshell
 shelly
+# Fenrir's Hyprland/shell defaults, printing and updates; see fenrir-settings/.
+fenrir-settings
+fenrir-welcome
 
 # Security. Enabled by default at install time, see backend.py's
 # configure_firewall(). firewalld over ufw for its D-Bus + polkit API,
@@ -220,10 +220,9 @@ qtengine
 app2unit
 caelestia-cli
 caelestia-shell
-# Login screen for installed systems. Present here only so the squashfs clone
-# carries it to the target; the live image autologins via sddm and never runs
-# it. backend.py's configure_greeter() is what switches the target to greetd.
-fenrir-greeter
+# Covers the desktop loading in after login, and raises the lock screen on
+# the autologin path. See backend.py's configure_autologin().
+fenrir-splash
 caelestia-meta
 python-materialyoucolor
 libcava

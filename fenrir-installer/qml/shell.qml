@@ -7,26 +7,26 @@ import Caelestia.Config
 import qs.components
 import qs.components.controls
 import qs.services
-// Quickshell's scanner only registers qs.* modules reached by a static import
-// from the root config, so a Loader-loaded page cannot pull in a new one.
-// These two are imported here on the pages' behalf, not used directly.
+// Only qs.* modules statically imported from the root register, so a Loader'd
+// page can't pull one in; these two are imported here on the pages' behalf.
 import qs.common
 import qs.modules.nexus.common
 
-// Shaped like Nexus's own window (modules/nexus/WindowFactory.qml): a real
-// FloatingWindow with surfaceFormat.opaque false, which is what actually lets
-// the transparent surface show through - the original installer painted an
-// opaque colour and never set it, which is why it never looked translucent.
-// Sized from the screen by ratio rather than a fixed pixel size, so it scales
-// the way the settings window does.
+// Shaped like Nexus's window (WindowFactory.qml); surfaceFormat.opaque: false is
+// what lets the translucent surface show through.
 FloatingWindow {
     id: root
 
     color: Colours.tPalette.m3surface
     surfaceFormat.opaque: false
 
-    implicitWidth: Math.round(implicitHeight * contentItem.Tokens.sizes.nexus.ratio)
-    implicitHeight: Math.round(screen.height * contentItem.Tokens.sizes.nexus.heightMult)
+    // Capped width with height derived from it, so it stays 16:9; the pages
+    // centre their column in the margin.
+    readonly property int contentCap: contentItem.Tokens.sizes.nexus.maxContentWidth + contentItem.Tokens.padding.extraLarge * 2
+    readonly property int maxWidth: Math.round(root.contentCap * 1.5)
+
+    implicitWidth: Math.min(Math.round(screen.height * contentItem.Tokens.sizes.nexus.heightMult * contentItem.Tokens.sizes.nexus.ratio), root.maxWidth)
+    implicitHeight: Math.round(implicitWidth / contentItem.Tokens.sizes.nexus.ratio)
 
     minimumSize.width: contentItem.Tokens.sizes.nexus.minWidth
     minimumSize.height: contentItem.Tokens.sizes.nexus.minHeight
@@ -82,14 +82,8 @@ FloatingWindow {
                 progress: "ProgressPage",
             }[root.currentPage]}.qml`
 
-            // A plain Loader destroys the outgoing page synchronously on
-            // source change (no true crossfade possible without a
-            // StackView), so this only animates the incoming page: jump
-            // instantly back to the "just appeared" state (Behavior
-            // disabled while resetting), then animate up to full
-            // opacity/scale, the same fade+scale-in Caelestia's own
-            // StackView content uses (Anim.Standard, driven by
-            // StackView.onActivating in TrayMenu.qml's SubMenu).
+            // A Loader drops the old page instantly, so only the new one animates:
+            // snap to the start state with the Behavior off, then fade and scale in.
             property bool resetting: false
             opacity: 1
             scale: 1
@@ -130,16 +124,6 @@ FloatingWindow {
             Connections {
                 target: pageLoader.item
                 ignoreUnknownSignals: true
-
-                // WelcomePage's "skip" jumps straight past every tour step.
-                // WelcomePage's "tour" and every TourStepBase's "next" both
-                // just advance one step — since the tour steps are a
-                // contiguous run in pageOrder immediately followed by
-                // "locale", the last step's "next" naturally spills over
-                // into the real installer flow with no special-casing.
-                function onSkip(): void {
-                    root.pageIndex = root.pageOrder.indexOf("locale");
-                }
 
                 function onNext(): void {
                     root.pageIndex += 1;
@@ -209,12 +193,7 @@ FloatingWindow {
         z: 100
         color: Colours.tPalette.m3surface
 
-        // Unlike the page Loader above, this overlay is a persistent item
-        // (never destroyed/recreated), so it gets the full show *and* hide
-        // fade+scale — closer to Caelestia's launcher/dashboard drawers
-        // (Behavior on offsetScale in modules/launcher/Wrapper.qml), just
-        // without their directional slide-offset since this is a full
-        // in-place content swap, not an edge-anchored drawer.
+        // Persistent, unlike the page Loader, so it animates both in and out.
         onVisibleChanged: if (!visible) {
             root.pickerFilter = "";
             pickerSearch.value = "";

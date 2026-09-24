@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
-"""Thin CLI wrapper around backend.py so a QML/Quickshell frontend can
-drive the install as a subprocess. backend.py itself is untouched here —
-this only adds a process boundary around it, in and out via JSON/stdout.
+"""Process boundary between the QML frontend and backend.py.
 
-Usage:
-    cli.py list-disks
-        Prints a JSON array of {path, size, model} to stdout.
+    cli.py list-disks  JSON array of {path, size, model}
+    cli.py install     plan JSON in $FENRIR_INSTALL_PLAN; progress lines, then
+                       INSTALL_OK or INSTALL_ERROR: <msg>
 
-    cli.py install '<json>'
-        <json> is an InstallPlan as a JSON object, passed as a single
-        argument rather than over stdin (Quickshell's Process type has no
-        clean way to signal EOF on stdin after writing to it). Streams
-        plain progress lines to stdout as the install runs. Prints a final
-        "INSTALL_OK" or "INSTALL_ERROR: <message>" line and exits 0 or 1.
+The plan carries the password, so it's in the environment: argv is readable by
+every user via ps, and Quickshell's Process can't signal EOF on stdin.
 """
 
 import json
+import os
 import sys
 
 import backend
@@ -26,17 +21,16 @@ def _cmd_list_disks():
 
 
 def _cmd_install(plan_json):
-    plan_data = json.loads(plan_json)
-    plan = backend.InstallPlan(**plan_data)
-
     def progress(line):
         print(line, flush=True)
 
     try:
+        if not plan_json:
+            raise ValueError("no install plan in $FENRIR_INSTALL_PLAN")
+        plan = backend.InstallPlan(**json.loads(plan_json))
         backend.run_install(plan, progress)
     except Exception as exc:
-        # Catch everything, not just InstallError, so INSTALL_OK/INSTALL_ERROR
-        # always prints — otherwise QML waits forever on a silently-dead process.
+        # Everything, not just InstallError, or QML waits forever on a dead process.
         print(f"INSTALL_ERROR: {exc}", flush=True)
         sys.exit(1)
     print("INSTALL_OK", flush=True)
@@ -45,10 +39,11 @@ def _cmd_install(plan_json):
 def main():
     if sys.argv[1:2] == ["list-disks"] and len(sys.argv) == 2:
         _cmd_list_disks()
-    elif sys.argv[1:2] == ["install"] and len(sys.argv) == 3:
-        _cmd_install(sys.argv[2])
+    elif sys.argv[1:2] == ["install"] and len(sys.argv) == 2:
+        # Popped, so none of the install's child processes inherit it.
+        _cmd_install(os.environ.pop("FENRIR_INSTALL_PLAN", ""))
     else:
-        print(f"usage: {sys.argv[0]} list-disks|install '<plan json>'", file=sys.stderr)
+        print(f"usage: {sys.argv[0]} list-disks|install (plan in $FENRIR_INSTALL_PLAN)", file=sys.stderr)
         sys.exit(2)
 
 

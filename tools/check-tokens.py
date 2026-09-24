@@ -14,7 +14,6 @@ QMLTYPES = Path("/usr/lib/qt6/qml/Caelestia/Config/caelestia-config.qmltypes")
 
 DEFAULT_ROOTS = (
     "fenrir-installer/qml",
-    "fenrir-greeter/qml",
     "fenrir-nexus-patches",
 )
 

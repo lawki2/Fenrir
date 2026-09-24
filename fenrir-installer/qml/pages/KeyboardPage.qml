@@ -22,13 +22,13 @@ InstallerPage {
     readonly property var layoutOptions: FenrirNames.layoutOptions(layoutProc.exited ? layoutProc.lines : [root.defaultLayout])
 
     ColumnLayout {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 
-        // X11 layouts, not `list-keymaps`: this is what Hyprland and the Nexus
-        // layout picker both speak, and the only one of the two namespaces
-        // xkeyboard-config has readable descriptions for. backend.py derives
-        // the console keymap from it.
+        // X11 layouts: what Hyprland and Nexus use, and the namespace with readable
+        // names. backend.py derives the console keymap from it.
         Process {
             id: layoutProc
             command: ["localectl", "list-x11-keymap-layouts"]

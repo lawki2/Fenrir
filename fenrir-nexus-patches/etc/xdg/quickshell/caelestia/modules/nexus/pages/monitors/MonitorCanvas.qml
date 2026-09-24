@@ -4,17 +4,12 @@ import QtQuick
 import Caelestia.Config
 import qs.modules.nexus.common
 
-// Windows-Settings-style monitor arrangement canvas: renders each monitor
-// to scale (real pixel coordinates mapped into the available canvas area),
-// draggable with edge-snapping. Real pixel geometry is owned by the parent
-// page (MonitorsPage.qml); this component is presentation + interaction
-// only - it reports a snapped real-pixel position via positionChanged and
-// waits for the parent to feed the updated model back down, rather than
-// owning any persistent state itself.
+// Drag-to-arrange canvas with edge snapping. Stateless: it reports positions via
+// positionChanged and MonitorsPage feeds the model back down.
 Item {
     id: root
 
-    // [{name, label, x, y, width, height, primary}], real pixel coords
+    // [{name, x, y, width, height, lw, lh, primary}]; x/y/lw/lh are Hyprland layout coords
     required property var monitors
     property string selectedMonitor
 
@@ -25,8 +20,8 @@ Item {
 
     readonly property real minX: root.monitors.length ? root.monitors.reduce((acc, m) => Math.min(acc, m.x), root.monitors[0].x) : 0
     readonly property real minY: root.monitors.length ? root.monitors.reduce((acc, m) => Math.min(acc, m.y), root.monitors[0].y) : 0
-    readonly property real maxX: root.monitors.length ? root.monitors.reduce((acc, m) => Math.max(acc, m.x + m.width), root.monitors[0].x + root.monitors[0].width) : 1
-    readonly property real maxY: root.monitors.length ? root.monitors.reduce((acc, m) => Math.max(acc, m.y + m.height), root.monitors[0].y + root.monitors[0].height) : 1
+    readonly property real maxX: root.monitors.length ? root.monitors.reduce((acc, m) => Math.max(acc, m.x + m.lw), root.monitors[0].x + root.monitors[0].lw) : 1
+    readonly property real maxY: root.monitors.length ? root.monitors.reduce((acc, m) => Math.max(acc, m.y + m.lh), root.monitors[0].y + root.monitors[0].lh) : 1
     readonly property real spanX: Math.max(1, maxX - minX)
     readonly property real spanY: Math.max(1, maxY - minY)
 
@@ -40,7 +35,7 @@ Item {
     }
 
     function rectsOverlap(a: var, b: var): bool {
-        return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+        return a.x < b.x + b.lw && a.x + a.lw > b.x && a.y < b.y + b.lh && a.y + a.lh > b.y;
     }
 
     function isOverlapping(name: string): bool {
@@ -65,8 +60,8 @@ Item {
             selected: modelData === root.selectedMonitor
             overlapping: root.isOverlapping(modelData)
 
-            width: (data?.width ?? 0) * root.canvasScale
-            height: (data?.height ?? 0) * root.canvasScale
+            width: (data?.lw ?? 0) * root.canvasScale
+            height: (data?.lh ?? 0) * root.canvasScale
             x: root.offsetX + ((data?.x ?? 0) - root.minX) * root.canvasScale
             y: root.offsetY + ((data?.y ?? 0) - root.minY) * root.canvasScale
 
@@ -82,8 +77,8 @@ Item {
 
                     const ox = root.offsetX + (other.x - root.minX) * root.canvasScale;
                     const oy = root.offsetY + (other.y - root.minY) * root.canvasScale;
-                    const ow = other.width * root.canvasScale;
-                    const oh = other.height * root.canvasScale;
+                    const ow = other.lw * root.canvasScale;
+                    const oh = other.lh * root.canvasScale;
 
                     if (Math.abs(boxX - (ox + ow)) < snapPx)
                         snappedX = ox + ow;
@@ -96,9 +91,7 @@ Item {
                         snappedY = oy - box.height;
                 }
 
-                // Snap instantly rather than waiting for the parent's model
-                // to round-trip back down - avoids a visible flash at the
-                // raw, pre-snap drop position.
+                // Snap now rather than after the model round-trip, to avoid a flash.
                 box.x = snappedX;
                 box.y = snappedY;
 

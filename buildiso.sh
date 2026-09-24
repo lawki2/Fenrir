@@ -71,10 +71,8 @@ import ${src_dir}/util-iso-mount.sh
 
 check_requirements
 
-# buildiso.sh only assembles what build-local-repo.sh already produced, so a
-# source tree newer than its built package silently ships the old one. This
-# cost a full ISO build and VM install before it was noticed.
-for pkg_dir in fenrir-installer fenrir-greeter; do
+# Refuse to assemble an ISO from a package older than its source tree.
+for pkg_dir in fenrir-installer fenrir-splash fenrir-settings fenrir-welcome; do
     built="$(find "${src_dir}/local-repo" -maxdepth 1 -name "${pkg_dir}-*.pkg.tar.zst" \
         -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
     if [[ -z "$built" ]]; then

@@ -136,45 +136,15 @@ prepare_profile(){
 
     rm -f ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
     if [ "$profile" == "fenrir" ]; then
-        # limine and limine-mkinitcpio-hook are excluded from the live
-        # image's own package list. Their post-install pacman hook deploys
-        # Limine onto a mounted ESP, which doesn't exist while mkarchiso is
-        # just building a squashfs, so it fails loudly (harmlessly, but
-        # noisily) every build. The live ISO boots via mkarchiso's own
-        # SYSLINUX/GRUB setup, not a pacstrapped Limine, so it doesn't need
-        # them anyway.
+        # limine's hooks need a mounted ESP, which a squashfs build doesn't have;
+        # the live ISO boots via GRUB/SYSLINUX anyway. Staged for the target below.
         grep -vE '^(limine|limine-mkinitcpio-hook)$' ${src_dir}/archiso/packages_fenrir.x86_64 > ${src_dir}/archiso/packages.x86_64
-        # sddm, not greetd: the live image autologins straight into the desktop
-        # and never shows a login screen, so there is nothing for the greeter to
-        # do here. The installer switches the target to greetd instead.
+        # Installed systems autologin through sddm too; see configure_autologin().
         ln -sf /usr/lib/systemd/system/sddm.service ${src_dir}/archiso/airootfs/etc/systemd/system/display-manager.service
-        # fenrir-installer pacstraps the same package list the live image
-        # itself was built from, so the installed system always matches
-        # what's already been verified booting live. Baking a copy into
-        # the airootfs is how it reads that list at install time. Unlike
-        # packages.x86_64 above, this keeps limine/limine-mkinitcpio-hook,
-        # since this list is used to pacstrap the real target disk, which
-        # does have a real ESP for that hook to deploy onto, and provides
-        # limine-mkinitcpio/limine-update, which limine-entry-tool alone
-        # does not ship.
+        # Its presence marks a running live image (installer autostart, splash).
         cp ${src_dir}/archiso/packages_fenrir.x86_64 ${src_dir}/archiso/airootfs/etc/fenrir-packages.x86_64
-        # fenrir-installer re-pacstraps this same package list onto the
-        # real target disk from *within* the booted live system, wherever
-        # that's actually running, so the local packages need to physically
-        # ship inside the live image too, not just be reachable from this
-        # build host. archiso/airootfs/etc/pacman.conf is the live image's
-        # own real /etc/pacman.conf (copied in as-is, unlike
-        # archiso/pacman.conf which mkarchiso only uses for a temporary
-        # build-time work config), so its [fenrir-local] entry points here
-        # instead, at this baked-in copy.
-        # limine can't be installed into the live image: one of its pacman
-        # hooks deploys onto a mounted ESP that doesn't exist while mkarchiso
-        # builds a squashfs, and limine-mkinitcpio-hook ships an
-        # /etc/pacman.d/hooks override that replaces the kernel's own
-        # initramfs hook. Since the offline install clones the live image
-        # rather than pacstrapping, the target would inherit that gap and
-        # limine-install would not exist - so stage the package files here and
-        # let backend.py install them once a real ESP is mounted.
+        # The clone inherits limine's absence, so ship its packages for
+        # backend.py to install once the target's ESP is mounted.
         stage=${src_dir}/archiso/airootfs/opt/fenrir-bootloader
         rm -rf ${stage}
         mkdir -p ${stage}
@@ -185,20 +155,9 @@ prepare_profile(){
             esac
         done
 
+        # Clears a stale copy from older builds: the packages are already
+        # unpacked in the squashfs, so shipping them again only cost ~130MB.
         rm -rf ${src_dir}/archiso/airootfs/opt/fenrir-local-repo
-        mkdir -p ${src_dir}/archiso/airootfs/opt/fenrir-local-repo
-        cp ${src_dir}/local-repo/*.pkg.tar.zst ${src_dir}/archiso/airootfs/opt/fenrir-local-repo/
-        cp -P ${src_dir}/local-repo/fenrir-local.db ${src_dir}/local-repo/fenrir-local.db.tar.gz \
-            ${src_dir}/local-repo/fenrir-local.files ${src_dir}/local-repo/fenrir-local.files.tar.gz \
-            ${src_dir}/archiso/airootfs/opt/fenrir-local-repo/
-        # Not committed to the tracked archiso/airootfs/etc/pacman.conf,
-        # since local-repo/ is a build-time-only concept. Guarded so
-        # repeated fenrir builds in the same checkout don't append it
-        # twice.
-        if ! grep -q "^\[fenrir-local\]$" ${src_dir}/archiso/airootfs/etc/pacman.conf; then
-            sed -i "/^\[cachyos\]$/i [fenrir-local]\nSigLevel = Optional TrustAll\nServer = file:///opt/fenrir-local-repo\n" \
-                ${src_dir}/archiso/airootfs/etc/pacman.conf
-        fi
     else
         die "Unknown profile: [%s]" "${profile}"
     fi
@@ -236,18 +195,11 @@ run_build() {
     cp -r archiso ${work_dir}/archiso
 
     if [ "$_profile" == "fenrir" ]; then
-        # [fenrir-local] is injected into the work copy only, not the
-        # tracked archiso/pacman.conf, since local-repo/ is a build-time-
-        # only concept. Using an absolute host path here is fine: this
-        # pacman.conf is only ever used directly by build-time pacstrap on
-        # this same host, never copied into a live image (that's
-        # archiso/airootfs/etc/pacman.conf, a different file, which points
-        # at the live-filesystem copy instead).
+        # Work copy only: this pacman.conf drives build-time pacstrap on this
+        # host, so an absolute host path is fine and never reaches the image.
         cat <<EOF >> ${work_dir}/archiso/pacman.conf
 
-# Locally prebuilt AUR packages Caelestia and fenrir-installer need (see
-# build-local-repo.sh). Listed last as an override doesn't apply here;
-# pacman.conf repo order only matters for same-named package precedence.
+# Locally built AUR and Fenrir packages, see build-local-repo.sh.
 [fenrir-local]
 SigLevel = Optional TrustAll
 Server = file://${src_dir}/local-repo

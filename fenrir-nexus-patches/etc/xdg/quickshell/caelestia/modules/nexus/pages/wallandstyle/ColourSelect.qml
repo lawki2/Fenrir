@@ -68,10 +68,8 @@ PageBase {
     ]
     readonly property list<string> variantValues: ["tonalspot", "vibrant", "expressive", "fidelity", "fruitsalad", "monochrome", "neutral", "rainbow", "content"]
 
-    // "dynamic"'s "flavours" are contrast levels (default/hard), not real
-    // palettes, but caelestia scheme list already reports them the same
-    // shape as every other scheme, so the same flavour mechanism covers
-    // both - only the row label changes.
+    // dynamic's "flavours" are contrast levels, but scheme list reports them in the
+    // same shape, so one mechanism covers both.
     function refreshFlavourItems(): void {
         const flavours = Object.keys(root.schemeData[root.selectedName] ?? {}).sort();
         const items = [];
@@ -116,10 +114,7 @@ PageBase {
                 id: listCollector
             }
             onExited: exitCode => {
-                // schemeData already defaults to {} - on any failure just
-                // leave it there rather than letting a malformed/empty
-                // response (a CLI error, an upstream format change) throw
-                // out of JSON.parse and take the whole page down with it.
+                // Leave schemeData at {} on failure; a throw here would take the page down.
                 if (exitCode !== 0)
                     return;
                 try {

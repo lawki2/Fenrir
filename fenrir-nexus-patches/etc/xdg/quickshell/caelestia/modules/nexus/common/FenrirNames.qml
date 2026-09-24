@@ -4,18 +4,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Turns the raw codes the system hands us ("sv_SE.UTF-8", "se",
-// "Europe/Stockholm") into something a person can read, from the system's own
-// data rather than a hand-written table: iso-codes for language and country
-// names, xkeyboard-config for layout descriptions, tzdata's zone.tab for
-// timezones. Shared by the Nexus settings pages and the installer, which
-// symlinks this directory in.
-//
-// zone.tab doubles as the timezone whitelist. `timedatectl list-timezones`
-// returns 598 entries, ~180 of which are deprecated aliases (US/Eastern,
-// Canada/Atlantic, EST, Asia/Calcutta) or technical Etc/GMT offsets. zone.tab
-// lists only the 418 real ones and drops every alias - without losing genuine
-// cities like Africa/Accra, which the stricter zone1970.tab merges away.
+// Readable names for locale, layout and timezone codes from the system's own data
+// (iso-codes, xkeyboard-config, zone.tab). zone.tab doubles as the tz whitelist.
 Singleton {
     id: root
 
@@ -28,9 +18,7 @@ Singleton {
     property var layouts: ({})
     property var zoneCountry: ({})
 
-    // iso-639-2 covers only 183 languages by 2-letter code, which leaves half
-    // of locale.gen unlabelled; -3 adds the 3-letter ones (anp, yue, szl) and
-    // -5 the collections (ber). Together they name every locale glibc ships.
+    // 639-2 alone leaves half of locale.gen unnamed; -3 and -5 cover the rest.
     function languageName(code: string): string {
         return root.languages[code] ?? root.languages3[code] ?? root.languages5[code] ?? code;
     }
@@ -68,20 +56,14 @@ Singleton {
         return country ? `${city} (${country})` : city;
     }
 
-    // "custom" is not a layout, it is a placeholder for people who hand-write
-    // their own xkb symbols file; picking it yields a dead keyboard. "epo" is
-    // constructed, matching the locales dropped below. Braille stays: it is an
-    // accessibility input method, not a curiosity.
+    // "custom" is a placeholder that yields a dead keyboard; "epo" is constructed.
     readonly property var hiddenLayouts: ["custom", "epo"]
 
     // Antarctica's ten zones are research stations with no civilian
     // population. Inhabited remote places (Norfolk, St Helena, Pitcairn) stay.
     readonly property var hiddenZoneCountries: ["AQ"]
 
-    // iso-639-3 types every language: L living, H historical, C constructed,
-    // E extinct, S special. Anything but living is a curiosity here (Sanskrit,
-    // Toki Pona, Geez), and hiding it costs nobody their own language. Codes
-    // we have no type for, like the "ber" collection, are kept.
+    // Hide anything iso-639-3 doesn't type as living; untyped codes are kept.
     function isObscureLanguage(code: string): bool {
         const type = root.languageTypes[code];
         return type !== undefined && type !== "L";

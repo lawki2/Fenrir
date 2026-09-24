@@ -7,16 +7,8 @@ import qs.components
 import qs.services
 import qs.modules.nexus.common
 
-// Live key-capture rebind row: click the box, press the new combo, done.
-// Qt.Key_A..Z and Qt.Key_0..9 are documented to numerically equal their
-// ASCII codes, so String.fromCharCode(key) is exact for those - everything
-// else is resolved through Qt's own symbolic Qt.Key_* constants rather
-// than guessed numeric codes (an unrecognised symbol just fails to match
-// and the branch is silently unreachable, never a wrong value). Named-key
-// spelling matches Hyprland's XKB-derived key names, kept consistent with
-// whatever variables.lua/this manifest already uses for a given key
-// (e.g. "TAB", "space", "backslash") so re-capturing an unchanged combo
-// round-trips to the identical string instead of a differently-cased one.
+// Key-capture rebind row. Names match variables.lua's spelling ("TAB", "space")
+// so re-capturing an unchanged combo round-trips to the same string.
 ConnectedRect {
     id: root
 
@@ -86,16 +78,8 @@ ConnectedRect {
             || key === Qt.Key_AltGr;
     }
 
-    // Four real manifest entries (kbGoToWs="SUPER", kbMoveWinToWs="SUPER +
-    // ALT", kbGoToWsGroup="CTRL + SUPER", kbMoveWinToWsGroup="CTRL + SUPER
-    // + ALT") are pure modifier chords with no regular key at all -
-    // Keys.onPressed alone can never complete one of these, since it
-    // returns early on every modifier keypress waiting for a "real" key
-    // that's never coming. Building the ordered name list from a tracked
-    // set of held modifier keys (not event.modifiers, whose value on a
-    // release event isn't reliably the pre-release state) lets
-    // Keys.onReleased below complete the capture once every held modifier
-    // has been let go with nothing else pressed in between.
+    // Some binds are modifier-only chords (kbGoToWs = "SUPER"), which only complete
+    // on release; tracked held keys, since event.modifiers is unreliable on release.
     function orderedModifierNames(keys: var): var {
         const present = {
             ctrl: false,
