@@ -15,6 +15,7 @@ import qs.modules.nexus.pages.firewall
 import qs.modules.nexus.pages.keybinds
 import qs.modules.nexus.pages.lookandfeel
 import qs.modules.nexus.pages.monitors
+import qs.modules.nexus.pages.mouse
 import qs.modules.nexus.pages.network
 import qs.modules.nexus.pages.nightlight
 import qs.modules.nexus.pages.panels
@@ -29,7 +30,10 @@ import qs.modules.nexus.pages.panels.taskbar
 QtObject {
     id: root
 
-    readonly property list<Component> pageComps: [
+    readonly property list<Component> pageComps: allComps.filter((_, i) => PageRegistry.shown(PageRegistry.allPages[i]))
+
+    // Same order as PageRegistry.allPages.
+    readonly property list<Component> allComps: [
         // Personalise
         Component {
             StackPage {
@@ -184,6 +188,13 @@ QtObject {
         },
 
         // Input
+        Component {
+            StackPage {
+                Component {
+                    MouseAndTouchpadPage {}
+                }
+            }
+        },
         Component {
             StackPage {
                 Component {

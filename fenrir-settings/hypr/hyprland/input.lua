@@ -8,9 +8,13 @@ hl.config({
         repeat_delay       = 250,
         repeat_rate        = 35,
         focus_on_close     = 1,
+        sensitivity        = vars.pointerSpeed,
+        natural_scroll     = vars.mouseNaturalScroll,
 
         touchpad           = {
-            natural_scroll       = true,
+            natural_scroll       = vars.touchpadNaturalScroll,
+            tap_to_click         = vars.touchpadTapToClick,
+            clickfinger_behavior = vars.touchpadClickFinger,
             disable_while_typing = vars.touchpadDisableTyping,
             scroll_factor        = vars.touchpadScrollFactor,
         },

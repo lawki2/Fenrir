@@ -64,12 +64,23 @@ repair_live_leftovers() {
     systemctl daemon-reload 2>/dev/null || true
 }
 
+# Without quiet, Limine prints a line each for the kernel and initramfs ahead of the splash.
+# An explicit quiet: line is the user's choice and is left alone.
+quiet_limine() {
+    conf=/boot/limine.conf
+    [ -f "$conf" ] || return 0
+    grep -q '^[[:space:]]*quiet:' "$conf" || sed -i '1i quiet: yes' "$conf"
+}
+
 post_install() {
     repair_live_leftovers
+    quiet_limine
     # Not in a chroot: that's the ISO build, and the installer runs it itself.
     systemd-detect-virt --chroot -q || /usr/lib/fenrir/fenrir-setup-snapshots || echo "fenrir-settings: snapshot setup failed; updates still work, without rollback"
     # Keeps firmware update info current for Settings > Updates.
     systemctl enable --now fwupd-refresh.timer 2>/dev/null || true
+    # Closes the app hogging memory before the whole system stalls; see the oomd drop-ins.
+    systemctl enable --now systemd-oomd.service 2>/dev/null || true
     setup_printing
     migrate_homes
 }

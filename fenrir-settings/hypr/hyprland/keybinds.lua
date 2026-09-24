@@ -131,12 +131,16 @@ hl.bind(vars.kbMusicWs, hl.dsp.exec_cmd("caelestia toggle music"))
 hl.bind(vars.kbCommunicationWs, hl.dsp.exec_cmd("caelestia toggle communication"))
 hl.bind(vars.kbTodoWs, hl.dsp.exec_cmd("caelestia toggle todo"))
 
--- Apps
-hl.bind(vars.kbTerminal, hl.dsp.exec_cmd(vars.terminal))
-hl.bind(vars.kbBrowser, hl.dsp.exec_cmd(vars.browser))
-hl.bind(vars.kbEditor, hl.dsp.exec_cmd(vars.editor))
-hl.bind(vars.kbFileExplorer, hl.dsp.exec_cmd(vars.fileExplorer))
-hl.bind("CTRL + ALT + V", hl.dsp.exec_cmd(vars.audioSettings))
+-- Apps, each in its own unit so running out of memory closes that app rather than the session.
+local function app(cmd)
+    return hl.dsp.exec_cmd("app2unit -- " .. cmd)
+end
+
+hl.bind(vars.kbTerminal, app(vars.terminal))
+hl.bind(vars.kbBrowser, app(vars.browser))
+hl.bind(vars.kbEditor, app(vars.editor))
+hl.bind(vars.kbFileExplorer, app(vars.fileExplorer))
+hl.bind("CTRL + ALT + V", app(vars.audioSettings))
 
 -- Utilities
 hl.bind(vars.kbScreenshot, hl.dsp.exec_cmd("caelestia screenshot"), { locked = true })

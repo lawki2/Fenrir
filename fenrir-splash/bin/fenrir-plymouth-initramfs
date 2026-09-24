@@ -1,0 +1,23 @@
+#!/bin/sh
+# mkinitcpio's plymouth hook copies the theme into the initramfs, so a changed theme needs a rebuild to show at boot.
+
+theme=/usr/share/plymouth/themes/fenrir
+stamp=/var/lib/fenrir/plymouth-theme.sum
+
+# Image and package builds make their own initramfs afterwards.
+systemd-detect-virt --chroot -q && exit 0
+grep -qs '^HOOKS=.*plymouth' /etc/mkinitcpio.conf /etc/mkinitcpio.conf.d/*.conf || exit 0
+
+# Packages are rebuilt with every release, so only a real change to the theme is worth a rebuild.
+sum=$(cat "$theme"/* | sha256sum | cut -d' ' -f1)
+[ "$(cat "$stamp" 2>/dev/null)" = "$sum" ] && exit 0
+
+# Limine keeps its initramfs on the ESP, and only its own tool updates them there.
+if command -v limine-mkinitcpio >/dev/null; then
+    limine-mkinitcpio
+else
+    /usr/bin/mkinitcpio -P
+fi || exit 1
+
+mkdir -p "${stamp%/*}"
+echo "$sum" > "$stamp"

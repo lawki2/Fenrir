@@ -11,7 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 TARGET = Path("/mnt")
-BTRFS_SUBVOLUMES = ("@", "@home", "@root", "@srv", "@cache", "@tmp", "@log")
+# @swap stands apart because btrfs can't snapshot a subvolume holding an active swapfile.
+BTRFS_SUBVOLUMES = ("@", "@home", "@root", "@srv", "@cache", "@tmp", "@log", "@swap")
 BTRFS_MOUNTS = {
     "@": "/",
     "@home": "/home",
@@ -20,7 +21,11 @@ BTRFS_MOUNTS = {
     "@cache": "/var/cache",
     "@tmp": "/var/tmp",
     "@log": "/var/log",
+    "@swap": "/swap",
 }
+SWAP_FILE = "swap/swapfile"
+# Hibernating needs room for the memory apps hold, not all of RAM; past this, it falls back to suspend.
+SWAP_MAX_GIB = 32
 MOUNT_OPTIONS = "compress=zstd,noatime"
 
 
@@ -304,6 +309,29 @@ def genfstab_target(progress):
     (TARGET / "etc/fstab").write_text(result.stdout)
 
 
+def _swap_gib(root_part):
+    # As big as RAM so a hibernation image fits, up to SWAP_MAX_GIB and a quarter of the disk.
+    with open("/proc/meminfo") as meminfo:
+        ram_kib = next(int(line.split()[1]) for line in meminfo if line.startswith("MemTotal:"))
+    part_bytes = int(subprocess.run(
+        ["blockdev", "--getsize64", root_part], check=True, capture_output=True, text=True
+    ).stdout)
+    return max(1, min(-(-ram_kib // 1024 ** 2), SWAP_MAX_GIB, part_bytes // 4 // 1024 ** 3))
+
+
+def configure_swap(root_part, progress):
+    # zram stays first in line (higher priority); this takes its overflow and hibernation images.
+    size_gib = _swap_gib(root_part)
+    progress(f"Creating a {size_gib} GiB swap file")
+    _stream(
+        ["btrfs", "filesystem", "mkswapfile", "--size", f"{size_gib}g", "--uuid", "clear",
+         str(TARGET / SWAP_FILE)],
+        progress,
+    )
+    with open(TARGET / "etc/fstab", "a") as fstab:
+        fstab.write(f"/{SWAP_FILE} none swap defaults 0 0\n")
+
+
 def configure_locale(timezone, locale, progress):
     progress(f"Setting timezone to {timezone}")
     _stream(
@@ -543,8 +571,9 @@ def finalize_bootloader(progress):
     progress("Configuring Limine to boot straight to the desktop")
     limine_conf = TARGET / "boot/limine.conf"
     lines = limine_conf.read_text().splitlines()
-    lines = [line for line in lines if not line.strip().startswith("timeout:")]
-    lines.insert(0, "timeout: 0")
+    lines = [line for line in lines if not line.strip().startswith(("timeout:", "quiet:"))]
+    # Quiet, or Limine prints a line each for the kernel and initramfs ahead of the splash.
+    lines[:0] = ["timeout: 0", "quiet: yes"]
     limine_conf.write_text("\n".join(lines) + "\n")
 
 
@@ -613,7 +642,9 @@ def run_install(plan: InstallPlan, progress):
     remove_live_only_packages(progress)
     initialize_keyring(progress)
     configure_fenrir_repo(progress)
+    _, root_part = _partition_paths(plan.disk)
     genfstab_target(progress)
+    configure_swap(root_part, progress)
     configure_locale(plan.timezone, plan.locale, progress)
     configure_keyboard(plan.keyboard, progress)
     configure_autologin(plan.username, progress)
@@ -622,7 +653,6 @@ def run_install(plan: InstallPlan, progress):
     configure_sudo(progress)
     configure_polkit(progress)
     configure_plymouth(progress)
-    _, root_part = _partition_paths(plan.disk)
     configure_kernel_cmdline(root_part, progress)
     install_bootloader_packages(progress)
     configure_snapshots(progress)

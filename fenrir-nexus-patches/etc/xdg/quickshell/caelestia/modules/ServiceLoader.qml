@@ -15,10 +15,11 @@ Scope {
         Brightness;
         Weather.reload();
 
-        // Fenrir: night light's schedule, update checks and the first-login welcome run on their own.
+        // Fenrir: night light's schedule, update checks, the first-login welcome and out-of-memory notices run on their own.
         NightLight;
         Updates;
         Welcome;
+        MemoryGuard;
 
         if (GlobalConfig.utilities.vpn.enabled)
             VPN;

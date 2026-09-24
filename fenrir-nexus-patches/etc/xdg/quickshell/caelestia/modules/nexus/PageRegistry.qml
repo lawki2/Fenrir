@@ -1,12 +1,20 @@
 pragma Singleton
 
 import QtQuick
+import qs.services
 
 QtObject {
     id: root
 
+    // What Nexus lists; PageCompRegistry filters its pages the same way, so the two stay index-aligned.
+    readonly property list<var> pages: allPages.filter(p => root.shown(p))
+
+    function shown(page: var): bool {
+        return !page.laptopOnly || Chassis.isLaptop;
+    }
+
     // popout: the bar popout mode that opens this page (bar/popouts/Wrapper.qml).
-    readonly property list<var> pages: [
+    readonly property list<var> allPages: [
         // Personalise
         {
             label: qsTr("Wallpaper & style"),
@@ -87,6 +95,13 @@ QtObject {
         },
 
         // Input
+        {
+            label: qsTr("Mouse & touchpad"),
+            icon: "touchpad_mouse",
+            description: qsTr("Pointer speed, scrolling, gestures"),
+            category: "input",
+            laptopOnly: true
+        },
         {
             label: qsTr("Keybinds"),
             icon: "keyboard",

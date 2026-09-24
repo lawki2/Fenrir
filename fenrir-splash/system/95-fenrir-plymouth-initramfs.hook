@@ -1,0 +1,10 @@
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = usr/share/plymouth/themes/fenrir/*
+
+[Action]
+Description = Updating the boot splash in the initramfs...
+When = PostTransaction
+Exec = /usr/lib/fenrir/fenrir-plymouth-initramfs

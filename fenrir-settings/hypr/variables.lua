@@ -12,14 +12,18 @@ return {
     fileExplorer               = "thunar",
     audioSettings              = "pavucontrol",
 
-    -- Touchpad
+    -- Touchpad and mouse (Fenrir); workspace swipes and the launcher share a finger count, the scratchpad takes the other
     kbLayout                   = "us",
     kbOptions                  = "",
+    pointerSpeed               = 0,
+    mouseNaturalScroll         = false,
+    touchpadNaturalScroll      = true,
+    touchpadTapToClick         = true,
+    touchpadClickFinger        = false,
     touchpadDisableTyping      = true,
-    touchpadScrollFactor       = 0.3,
-    gestureFingers             = 3,
-    workspaceSwipeFingers      = 4,
-    gestureFingersMore         = 4,
+    touchpadScrollFactor       = 1,
+    workspaceSwipeFingers      = 3,
+    gestureFingers             = 4,
 
     -- Blur
     blurEnabled                = true,
@@ -58,7 +62,8 @@ return {
     volumeMax                  = 100,
     cursorTheme                = "sweet-cursors",
     cursorSize                 = 24,
-    sleepGestureCmd            = "systemctl suspend-then-hibernate",
+    -- Fenrir: hibernating needs swap on disk and installs only have zram, so fall back to suspend like the shell does.
+    sleepGestureCmd            = "systemctl suspend-then-hibernate || systemctl suspend",
 
     ------------------
     ---- KEYBINDS ----

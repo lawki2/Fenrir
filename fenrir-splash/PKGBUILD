@@ -3,16 +3,23 @@ pkgname=fenrir-splash
 # build-local-repo.sh stamps the build time here, so every rebuild is an update.
 pkgver=0
 pkgrel=1
-pkgdesc="Fenrir's login-to-desktop transition overlay"
+pkgdesc="Fenrir's boot splash, carried from Plymouth through to the lock screen"
 arch=('x86_64')
 license=('GPL-3.0-only')
 depends=(
   'quickshell'
   'caelestia-shell'
+  'plymouth'
 )
 source=()
 
 package() {
   install -Dm644 "$startdir/qml/shell.qml" \
     "$pkgdir/etc/xdg/quickshell/fenrir-splash/shell.qml"
+  install -Dm644 -t "$pkgdir/usr/share/plymouth/themes/fenrir" \
+    "$startdir"/plymouth/{fenrir.plymouth,fenrir.script,wheel.png}
+  install -Dm644 -t "$pkgdir/usr/share/libalpm/hooks" \
+    "$startdir/system/95-fenrir-plymouth-initramfs.hook"
+  install -Dm755 -t "$pkgdir/usr/lib/fenrir" \
+    "$startdir/bin/fenrir-plymouth-initramfs"
 }

@@ -19,7 +19,7 @@ AMPLITUDE = 0.042 * SIZE
 WAVES = 10
 TRAVEL = 2  # wavelengths the squiggle moves per loop; whole, so the loop is seamless
 
-OUT = Path(__file__).resolve().parent.parent / "archiso/airootfs/usr/share/plymouth/themes/fenrir/wheel.png"
+OUT = Path(__file__).resolve().parent.parent / "fenrir-splash/plymouth/wheel.png"
 
 
 def frame(t: float) -> Image.Image:
