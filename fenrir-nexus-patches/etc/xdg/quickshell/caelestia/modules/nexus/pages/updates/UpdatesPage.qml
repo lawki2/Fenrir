@@ -49,6 +49,15 @@ PageBase {
         }
 
         StyledText {
+            visible: Updates.checkFailed
+            Layout.fillWidth: true
+            text: Updates.checkError
+            color: Colours.palette.m3error
+            font: Tokens.font.body.small
+            wrapMode: Text.WordWrap
+        }
+
+        StyledText {
             Layout.bottomMargin: Tokens.spacing.medium
             visible: Updates.lastChecked.getTime() > 0
             text: qsTr("Last checked %1").arg(Qt.formatTime(Updates.lastChecked, "hh:mm"))

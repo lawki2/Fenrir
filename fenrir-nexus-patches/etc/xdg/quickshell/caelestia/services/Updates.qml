@@ -14,6 +14,8 @@ Singleton {
     property list<var> firmware: []
     property bool checking: false
     property bool checkFailed: false
+    // checkupdates' own last line, e.g. "Cannot fetch updates".
+    property string checkError: ""
     property date lastChecked
     property list<string> updatedNames: []
 
@@ -54,11 +56,15 @@ Singleton {
         stdout: StdioCollector {
             id: checkOut
         }
+        stderr: StdioCollector {
+            id: checkErr
+        }
         // 0 lists updates, 2 means none, anything else is a failure to check.
         onExited: code => {
             const before = root.packages.length;
             root.checking = false;
             root.checkFailed = code !== 0 && code !== 2;
+            root.checkError = root.checkFailed ? (checkErr.text.trim().split("\n").pop() || qsTr("checkupdates exited with %1").arg(code)) : "";
             if (code === 0)
                 root.packages = checkOut.text.split("\n").map(l => l.match(/^(\S+) (\S+) -> (\S+)$/)).filter(m => m).map(m => ({
                                 name: m[1],
