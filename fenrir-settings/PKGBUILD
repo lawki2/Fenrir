@@ -33,7 +33,7 @@ package() {
   install -Dm755 "$startdir/bin/fenrir-branding" "$pkgdir/usr/lib/fenrir/fenrir-branding"
   install -Dm755 "$startdir/bin/fenrir-update-guard" "$pkgdir/usr/lib/fenrir/fenrir-update-guard"
   install -Dm755 "$startdir/bin/fenrir-setup-snapshots" "$pkgdir/usr/lib/fenrir/fenrir-setup-snapshots"
-  for hook in 00-fenrir-guard 00-fenrir-shell-pause zzz-fenrir-guard zzz-fenrir-shell-resume; do
+  for hook in 00-fenrir-guard 00-fenrir-shell-pause 00-fenrir-hypr-pause zzz-fenrir-guard zzz-fenrir-hypr-resume zzz-fenrir-shell-resume; do
     install -Dm644 "$startdir/system/$hook.hook" "$pkgdir/usr/share/libalpm/hooks/$hook.hook"
   done
   install -Dm644 "$startdir/system/zz-fenrir-branding.hook" "$pkgdir/usr/share/libalpm/hooks/zz-fenrir-branding.hook"

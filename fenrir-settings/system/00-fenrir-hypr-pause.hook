@@ -1,0 +1,12 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Path
+Target = usr/share/fenrir/hypr/*
+Target = usr/share/fenrir/hypr-loader.lua
+
+[Action]
+Description = Pausing Hyprland's config reloads until its update is complete...
+When = PreTransaction
+Exec = /usr/lib/fenrir/fenrir-update-guard hypr-pause

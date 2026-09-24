@@ -21,6 +21,23 @@ tell_shells() {
     done
 }
 
+# Each logged-in user's running Hyprland; $1 names the step for pacman's log.
+tell_hyprland() {
+    step=$1
+    shift
+    for sock in /run/user/[0-9]*/hypr/*/.socket.sock; do
+        [ -S "$sock" ] || continue
+        instance=${sock%/.socket.sock}
+        dir=${instance%/hypr/*}
+        user=$(id -nu "${dir##*/}" 2>/dev/null) || continue
+        if runuser -u "$user" -- env XDG_RUNTIME_DIR="$dir" HYPRLAND_INSTANCE_SIGNATURE="${instance##*/}" timeout 5 hyprctl "$@" >/dev/null 2>&1; then
+            echo "Hyprland for $user: $step"
+        else
+            echo "Couldn't reach $user's Hyprland to $step it"
+        fi
+    done
+}
+
 case "${1:-}" in
     start)
         # Held for as long as pacman runs, so it also ends if pacman dies before "finish".
@@ -33,6 +50,10 @@ case "${1:-}" in
         sha256sum "$plugins"/*.so > "$sums" 2>/dev/null || true
         tell_shells pause
         ;;
+    # Hyprland reloads the moment a config file changes, which mid-update can mean new files
+    # reading old ones; it waits for the one reload at the end instead.
+    hypr-pause) tell_hyprland pause eval 'hl.config({ misc = { disable_autoreload = true } })' ;;
+    hypr-resume) tell_hyprland reload reload config-only ;;
     finish) sync ;;
     resume)
         # A reload applies new QML in place; plugins already loaded in the process need a restart.
