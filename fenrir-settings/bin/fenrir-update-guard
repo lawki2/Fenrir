@@ -1,0 +1,45 @@
+#!/bin/sh
+# Run by pacman hooks around every transaction, so the Updates page and a terminal -Syu get the
+# same guard: no shutdown and no shell reload until the new files are complete and on disk.
+set -u
+
+plugins=/usr/lib/qt6/qml/Caelestia/lib
+sums=/run/fenrir-shell-plugins.sha256
+
+# Each logged-in user's Caelestia shell; a user without one is skipped. The fallback is the
+# single restart call that shells from before reload() existed understand.
+tell_shells() {
+    for dir in /run/user/[0-9]*; do
+        [ -d "$dir/quickshell" ] || continue
+        user=$(id -nu "${dir##*/}" 2>/dev/null) || continue
+        call() { runuser -u "$user" -- env XDG_RUNTIME_DIR="$dir" timeout 5 qs -c caelestia ipc call fenrirUpdates "$1" >/dev/null 2>&1; }
+        if call "$1" || { [ "$1" != pause ] && call resume; }; then
+            echo "Shell for $user: $1"
+        else
+            echo "Couldn't reach $user's shell to $1 it; log out and back in to finish the update"
+        fi
+    done
+}
+
+case "${1:-}" in
+    start)
+        # Held for as long as pacman runs, so it also ends if pacman dies before "finish".
+        pacman_pid=$PPID
+        setsid -f systemd-inhibit --what=shutdown:sleep --mode=block --who=Fenrir --why="Installing updates" \
+            sh -c "while kill -0 $pacman_pid 2>/dev/null; do sleep 1; done" </dev/null >/dev/null 2>&1 || true
+        ;;
+    pause)
+        # So resume can tell an update that only changed QML from one that changed the C++ plugins.
+        sha256sum "$plugins"/*.so > "$sums" 2>/dev/null || true
+        tell_shells pause
+        ;;
+    finish) sync ;;
+    resume)
+        # A reload applies new QML in place; plugins already loaded in the process need a restart.
+        how=reload
+        sha256sum -c --quiet "$sums" >/dev/null 2>&1 || how=restart
+        rm -f "$sums"
+        tell_shells "$how"
+        ;;
+esac
+exit 0

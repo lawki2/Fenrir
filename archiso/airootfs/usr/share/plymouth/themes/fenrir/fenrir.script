@@ -1,47 +1,44 @@
-Window.SetBackgroundTopColor(0.133, 0.133, 0.165);
-Window.SetBackgroundBottomColor(0.086, 0.086, 0.106);
+# The Fenrir scheme's background (#000d2a), the same as the login splash that follows.
+Window.SetBackgroundTopColor(0.0, 0.051, 0.165);
+Window.SetBackgroundBottomColor(0.0, 0.051, 0.165);
 
-progress_box.image = Image("progress_box.png");
-progress_box.sprite = Sprite(progress_box.image);
-progress_box.x = Window.GetX() + Window.GetWidth()  / 2 - progress_box.image.GetWidth()  / 2;
-progress_box.y = Window.GetY() + Window.GetHeight() / 2 - progress_box.image.GetHeight() / 2;
-progress_box.sprite.SetPosition(progress_box.x, progress_box.y, 0);
+# wheel.png is a grid of frames from tools/render-plymouth-wheel.py; keep these in step with it.
+wheel.size = 128;
+wheel.cols = 10;
+wheel.rows = 8;
 
-progress_bar.original_image = Image("progress_bar.png");
-progress_bar.sprite = Sprite();
-progress_bar.x = progress_box.x;
-progress_bar.y = progress_box.y;
-progress_bar.full_width = progress_bar.original_image.GetWidth();
-progress_bar.height = progress_bar.original_image.GetHeight();
-progress_bar.drawn_width = -1;
+# About a tenth of the screen height on large screens, never smaller than drawn.
+wheel.shown = wheel.size;
+if (Window.GetHeight() * 0.11 > wheel.size)
+    wheel.shown = Math.Int(Window.GetHeight() * 0.11);
 
-cap.image = Image("progress_cap.png");
-cap.sprite = Sprite(cap.image);
-cap.sprite.SetPosition(progress_bar.x, progress_bar.y, 2);
-
-# Future logo goes here, centred over the bar at z=3.
-
-fun progress_callback(duration, progress)
+wheel.sheet = Image("wheel.png");
+wheel.count = 0;
+for (row = 0; row < wheel.rows; row++)
 {
-    # Real unit-based progress, from the recorded profile in
-    # /var/lib/plymouth/boot-duration.
-    progress_bar.fraction = progress;
-    if (progress_bar.fraction > 1)
-        progress_bar.fraction = 1;
-
-    progress_bar.width = Math.Int(progress_bar.full_width * progress_bar.fraction);
-    if (progress_bar.width < progress_bar.height)
-        progress_bar.width = progress_bar.height;
-
-    if (progress_bar.width != progress_bar.drawn_width)
+    for (col = 0; col < wheel.cols; col++)
     {
-        progress_bar.drawn_width = progress_bar.width;
-        # Crop, not Scale: scaling squashes the rounded caps into ellipses.
-        progress_bar.image = progress_bar.original_image.Crop(0, 0, progress_bar.width, progress_bar.height);
-        progress_bar.sprite.SetImage(progress_bar.image);
-        progress_bar.sprite.SetPosition(progress_bar.x, progress_bar.y, 1);
-        cap.sprite.SetPosition(progress_bar.x + progress_bar.width - progress_bar.height, progress_bar.y, 2);
+        frame = wheel.sheet.Crop(col * wheel.size, row * wheel.size, wheel.size, wheel.size);
+        if (wheel.shown != wheel.size)
+            frame = frame.Scale(wheel.shown, wheel.shown);
+        wheel.frames[wheel.count] = frame;
+        wheel.count += 1;
     }
 }
 
-Plymouth.SetBootProgressFunction(progress_callback);
+# Future logo goes in the middle of the wheel, at z=2.
+wheel.sprite = Sprite(wheel.frames[0]);
+wheel.sprite.SetPosition(Window.GetX() + Window.GetWidth() / 2 - wheel.shown / 2,
+                         Window.GetY() + Window.GetHeight() / 2 - wheel.shown / 2, 1);
+wheel.frame = 0;
+
+# Called about 50 times a second, so the 80 frames loop every ~1.6 s.
+fun refresh_callback()
+{
+    wheel.frame += 1;
+    if (wheel.frame >= wheel.count)
+        wheel.frame = 0;
+    wheel.sprite.SetImage(wheel.frames[wheel.frame]);
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);

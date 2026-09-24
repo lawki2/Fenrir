@@ -7,67 +7,111 @@ QtObject {
 
     // popout: the bar popout mode that opens this page (bar/popouts/Wrapper.qml).
     readonly property list<var> pages: [
-        // Appearance
+        // Personalise
         {
             label: qsTr("Wallpaper & style"),
             icon: "palette",
             description: qsTr("Wallpaper, fonts, colours"),
-            category: "appearance",
+            category: "personalise",
             popout: "appearance"
         },
         {
+            label: qsTr("Look & feel"),
+            icon: "tune",
+            description: qsTr("Gaps, rounding, blur, animations"),
+            category: "personalise"
+        },
+        {
             label: qsTr("Desktop"),
-            icon: "desktop_windows",
+            icon: "widgets",
             description: qsTr("Desktop clock, audio visualiser"),
-            category: "appearance"
+            category: "personalise"
+        },
+        {
+            label: qsTr("Panels"),
+            icon: "dock_to_bottom",
+            description: qsTr("Dashboard, taskbar, launcher, sidebar"),
+            category: "personalise"
         },
 
-        // Connectivity
+        // Display
         {
             label: qsTr("Display"),
             icon: "monitor",
-            description: qsTr("Arrangement, resolution, refresh rate"),
-            category: "connectivity"
+            description: qsTr("Arrangement, resolution, rotation, scale"),
+            category: "display"
         },
         {
             label: qsTr("Night light"),
             icon: "nightlight",
             description: qsTr("Warm the screen on a schedule"),
-            category: "connectivity"
+            category: "display"
         },
+
+        // Network
         {
             label: qsTr("Network"),
             icon: "wifi",
             description: qsTr("Wi-Fi, ethernet, VPN"),
-            category: "connectivity",
+            category: "network",
             popout: "network"
         },
         {
             label: qsTr("Firewall"),
             icon: "security",
             description: qsTr("Block unsolicited incoming connections"),
-            category: "connectivity"
+            category: "network"
         },
+
+        // Devices
         {
             label: qsTr("Connected devices"),
             icon: "devices_other",
             description: qsTr("Bluetooth, pairing"),
-            category: "connectivity",
+            category: "devices",
             popout: "bluetooth",
             noFill: true
-        },
-        {
-            label: qsTr("Printers"),
-            icon: "print",
-            description: qsTr("Default printer, test page"),
-            category: "connectivity"
         },
         {
             label: qsTr("Audio"),
             icon: "volume_up",
             description: qsTr("App volumes, sound devices"),
-            category: "connectivity",
+            category: "devices",
             popout: "audio"
+        },
+        {
+            label: qsTr("Printers"),
+            icon: "print",
+            description: qsTr("Default printer, test page"),
+            category: "devices"
+        },
+
+        // Input
+        {
+            label: qsTr("Keybinds"),
+            icon: "keyboard",
+            description: qsTr("Rebind Hyprland shortcuts"),
+            category: "input"
+        },
+        {
+            label: qsTr("Language & region"),
+            icon: "globe",
+            description: qsTr("Language, keyboard layouts, date & time, units"),
+            category: "input"
+        },
+
+        // Apps
+        {
+            label: qsTr("Apps"),
+            icon: "apps",
+            description: qsTr("Default apps, favourites, hidden apps"),
+            category: "apps"
+        },
+        {
+            label: qsTr("Notifications"),
+            icon: "notifications",
+            description: qsTr("Notifications, toasts, timeouts"),
+            category: "apps"
         },
 
         // System
@@ -84,42 +128,10 @@ QtObject {
             category: "system"
         },
         {
-            label: qsTr("Plugins"),
-            icon: "extension",
-            description: qsTr("Manage plugins"),
-            category: "system"
-        },
-
-        // Shell
-        {
-            label: qsTr("Panels"),
-            icon: "dock_to_bottom",
-            description: qsTr("Dashboard, taskbar, launcher, sidebar"),
-            category: "shell"
-        },
-        {
-            label: qsTr("Keybinds"),
-            icon: "keyboard",
-            description: qsTr("Rebind Hyprland shortcuts"),
-            category: "shell"
-        },
-        {
-            label: qsTr("Apps"),
-            icon: "apps",
-            description: qsTr("Default apps, favourites, hidden apps"),
-            category: "shell"
-        },
-        {
-            label: qsTr("Services"),
+            label: qsTr("Advanced"),
             icon: "build",
-            description: qsTr("Poll intervals, lyrics backend"),
-            category: "shell"
-        },
-        {
-            label: qsTr("Language & region"),
-            icon: "globe",
-            description: qsTr("Language, keyboard layouts, date & time, units"),
-            category: "shell"
+            description: qsTr("Polling, media, lyrics, GPU"),
+            category: "system"
         },
 
         // About
@@ -128,6 +140,6 @@ QtObject {
             icon: "info",
             description: qsTr("System information, credits"),
             category: "about"
-        },
+        }
     ]
 }

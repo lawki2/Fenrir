@@ -1,0 +1,38 @@
+#!/bin/sh
+# Snapper for / (snap-pac snapshots every pacman run) with the snapshots in Limine's boot menu.
+# Safe to re-run. --no-initramfs is for the installer, which builds the initramfs itself later.
+set -eu
+
+[ -f /etc/fenrir-packages.x86_64 ] && exit 0
+[ "$(findmnt -no FSTYPE /)" = btrfs ] || exit 0
+
+if [ ! -f /etc/snapper/configs/root ]; then
+    snapper --no-dbus -c root create-config /
+    # Only snap-pac's before/after pairs, the last 10 updates' worth, never hourly ones.
+    snapper --no-dbus -c root set-config TIMELINE_CREATE=no NUMBER_LIMIT=20 NUMBER_LIMIT_IMPORTANT=10
+fi
+
+# Booting a read-only snapshot needs an overlay on top, per limine-snapper-sync's README.
+conf=/etc/mkinitcpio.conf
+rebuild=""
+if ! grep -q '^HOOKS=.*btrfs-overlayfs' "$conf"; then
+    hook=btrfs-overlayfs
+    grep -q '^HOOKS=.*\bsystemd\b' "$conf" && hook=sd-btrfs-overlayfs
+    sed -i "/^HOOKS=/s/\bfilesystems\b/filesystems $hook/" "$conf"
+    rebuild=yes
+fi
+
+# It matches the boot entry by machine-id when the entry carries one, else by PRETTY_NAME,
+# which older installs changed from CachyOS to Fenrir after their entry was written.
+esp_conf=/boot/limine.conf
+if [ -f "$esp_conf" ] && ! grep -q "machine-id=$(cat /etc/machine-id)" "$esp_conf"; then
+    entry=$(sed -n 's|^/+\{0,1\}\([^/+].*\)$|\1|p' "$esp_conf" | head -1)
+    if [ -n "$entry" ] && ! grep -q '^TARGET_OS_NAME=' /etc/limine-snapper-sync.conf; then
+        echo "TARGET_OS_NAME=\"$entry\"" >> /etc/limine-snapper-sync.conf
+    fi
+fi
+
+systemctl enable --now snapper-cleanup.timer limine-snapper-sync.service
+if [ -n "$rebuild" ] && [ "${1:-}" != --no-initramfs ]; then
+    limine-update
+fi

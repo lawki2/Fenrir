@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Path
+Target = etc/xdg/quickshell/*
+
+[Action]
+Description = Restarting the shell on its new files...
+When = PostTransaction
+Exec = /usr/lib/fenrir/fenrir-update-guard resume

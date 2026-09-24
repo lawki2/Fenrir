@@ -3,14 +3,13 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import Caelestia.Config
 import qs.components
 import qs.services
 import qs.modules.nexus.common
 
-// Rebinds the keybinds that go through variables.lua's vars.kbXxx, by writing
-// hypr-vars.lua overrides. `default` values mirror variables.lua by hand.
+// Rebinds the keybinds that go through variables.lua's vars.kbXxx, as hypr-vars.lua overrides
+// written through HyprVars. `default` values mirror variables.lua by hand.
 PageBase {
     id: root
 
@@ -252,7 +251,7 @@ PageBase {
         }
     ]
 
-    property var overrides: ({})
+    readonly property var overrides: HyprVars.overrides
 
     function currentValue(entry: var): string {
         return root.overrides[entry.id] ?? entry.default;
@@ -263,56 +262,17 @@ PageBase {
         return root.manifest.some(other => other.id !== entry.id && root.currentValue(other) === value);
     }
 
-    // hypr-vars.lua is a flat `return { key = "value", ... }`; not a Lua parser.
-    function parseHyprVars(text: string): var {
-        const result = {};
-        const re = /(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
-        let match;
-        while ((match = re.exec(text)) !== null)
-            result[match[1]] = match[2];
-        return result;
-    }
-
-    function serializeHyprVars(data: var): string {
-        const keys = Object.keys(data);
-        if (!keys.length)
-            return "return {}\n";
-        const lines = keys.map(k => `    ${k} = "${data[k]}",`);
-        return `return {\n${lines.join("\n")}\n}\n`;
-    }
-
-    function loadOverrides(): void {
-        root.overrides = root.parseHyprVars(hyprVarsFile.text());
-    }
-
     function rebind(id: string, newValue: string): void {
-        const data = root.parseHyprVars(hyprVarsFile.text());
-        data[id] = newValue;
-        hyprVarsFile.setText(root.serializeHyprVars(data));
-        root.overrides = data;
-        Hypr.extras.batchMessage(["reload"]);
+        HyprVars.set({
+            [id]: newValue
+        });
     }
-
-    Component.onCompleted: root.loadOverrides()
 
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         width: root.cappedWidth
         spacing: Tokens.spacing.large
-
-        FileView {
-            id: hyprVarsFile
-
-            path: `${Quickshell.env("HOME")}/.config/caelestia/hypr-vars.lua`
-            printErrors: false
-            // The first read can be async, so reload once the text actually lands.
-            onLoaded: root.loadOverrides()
-            onLoadFailed: error => {
-                if (error === FileViewError.FileNotFound)
-                    Qt.callLater(() => setText("return {}\n"));
-            }
-        }
 
         StyledText {
             Layout.fillWidth: true

@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Writing the update to disk...
+When = PostTransaction
+Exec = /usr/lib/fenrir/fenrir-update-guard finish

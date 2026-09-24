@@ -53,6 +53,7 @@ fi
 echo "$job" > "$dir/job"
 echo running > "$dir/state"
 : > "$dir/log"
+# Done only once pacman exits, after fenrir-update-guard's hook has synced the files to disk.
 setsid -f sh -c 'echo $$ > /run/fenrir-pkg/pid
     '"$cmd"' > /run/fenrir-pkg/log 2>&1
     echo $? > /run/fenrir-pkg/state'

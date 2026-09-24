@@ -34,7 +34,40 @@ migrate_homes() {
         done
 }
 
+# Installs made by copying the live ISO also copied its live-only boot setup. The worst part
+# rebuilt the pacman keyring on a tmpfs at every boot, which dropped the Fenrir repo key.
+repair_live_leftovers() {
+    [ -f /etc/fenrir-packages.x86_64 ] && return
+
+    systemctl disable pacman-init.service livecd-talk.service livecd-alsa-unmuter.service 2>/dev/null || true
+    rm -f /etc/systemd/system/pacman-init.service /etc/systemd/system/etc-pacman.d-gnupg.mount \
+        /etc/systemd/system/livecd-talk.service /etc/systemd/system/livecd-alsa-unmuter.service \
+        /etc/systemd/journald.conf.d/volatile-storage.conf /etc/systemd/logind.conf.d/do-not-suspend.conf
+    if mountpoint -q /etc/pacman.d/gnupg; then
+        gpgconf --homedir /etc/pacman.d/gnupg --kill all 2>/dev/null || true
+        umount -l /etc/pacman.d/gnupg
+    fi
+    fpr=BE0B53BD597DF2CDB8437E869C17423CED27E4BE
+    if ! pacman-key --list-keys "$fpr" >/dev/null 2>&1 && [ -f /etc/pacman.d/fenrir-signing-key.asc ]; then
+        pacman-key --add /etc/pacman.d/fenrir-signing-key.asc && pacman-key --lsign-key "$fpr"
+    fi
+
+    # Only the live ISO's own versions, so nothing a user set up is touched.
+    grep -q 'PermitRootLogin yes' /etc/ssh/sshd_config.d/10-archiso.conf 2>/dev/null \
+        && rm -f /etc/ssh/sshd_config.d/10-archiso.conf && systemctl try-reload-or-restart sshd.service 2>/dev/null
+    grep -q 'autologin liveuser' /etc/systemd/system/getty@tty1.service.d/autologin.conf 2>/dev/null \
+        && rm -rf /etc/systemd/system/getty@tty1.service.d
+    grep -q 'Installation Environment' /etc/motd 2>/dev/null && rm -f /etc/motd
+    grep -q 'automated_script' /root/.zlogin 2>/dev/null && rm -f /root/.zlogin /root/.automated_script.sh
+    # The installer's password-required wheel rule has to exist, or this would remove sudo.
+    [ -f /etc/sudoers.d/wheel ] && rm -f /etc/sudoers.d/g_wheel
+    systemctl daemon-reload 2>/dev/null || true
+}
+
 post_install() {
+    repair_live_leftovers
+    # Not in a chroot: that's the ISO build, and the installer runs it itself.
+    systemd-detect-virt --chroot -q || /usr/lib/fenrir/fenrir-setup-snapshots || echo "fenrir-settings: snapshot setup failed; updates still work, without rollback"
     # Keeps firmware update info current for Settings > Updates.
     systemctl enable --now fwupd-refresh.timer 2>/dev/null || true
     setup_printing

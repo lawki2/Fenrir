@@ -1,6 +1,6 @@
 [Plymouth Theme]
 Name=Fenrir
-Description=Fenrir boot splash - a plain loading bar, no spinner
+Description=Fenrir boot splash - a ring that ripples into a squiggle and back
 ModuleName=script
 
 [script]

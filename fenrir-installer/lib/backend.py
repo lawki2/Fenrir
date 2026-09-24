@@ -184,6 +184,22 @@ LIVE_ONLY_PATHS = (
     "var/cache/pacman/pkg/*",
     "var/lib/pacman/sync/*",
     "var/log/journal/*",
+    # Rebuilds the keyring on a tmpfs at every boot, which drops the Fenrir repo key.
+    "etc/systemd/system/pacman-init.service",
+    "etc/systemd/system/multi-user.target.wants/pacman-init.service",
+    "etc/systemd/system/etc-pacman.d-gnupg.mount",
+    # sshd with root password login; an install enables sshd itself if it wants it.
+    "etc/systemd/system/multi-user.target.wants/sshd.service",
+    "etc/ssh/sshd_config.d/10-archiso.conf",
+    "etc/systemd/system/getty@tty1.service.d",
+    "etc/systemd/system/livecd-*",
+    "etc/systemd/system/*.wants/livecd-*",
+    "etc/systemd/journald.conf.d/volatile-storage.conf",
+    "etc/systemd/logind.conf.d/do-not-suspend.conf",
+    "etc/sudoers.d/g_wheel",
+    "etc/motd",
+    "root/.automated_script.sh",
+    "root/.zlogin",
 )
 
 
@@ -510,6 +526,12 @@ def install_bootloader_packages(progress):
     shutil.rmtree(stage, ignore_errors=True)
 
 
+def configure_snapshots(progress):
+    # Before finalize_bootloader, whose initramfs rebuild picks up the overlay hook this adds.
+    progress("Setting up update snapshots")
+    _chroot(["/usr/lib/fenrir/fenrir-setup-snapshots", "--no-initramfs"], progress)
+
+
 def finalize_bootloader(progress):
     progress("Installing Limine")
     _chroot(["limine-install"], progress)
@@ -603,6 +625,7 @@ def run_install(plan: InstallPlan, progress):
     _, root_part = _partition_paths(plan.disk)
     configure_kernel_cmdline(root_part, progress)
     install_bootloader_packages(progress)
+    configure_snapshots(progress)
     finalize_bootloader(progress)
     enable_services(progress)
     configure_firewall(progress)

@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Holding off shutdown until the update is done...
+When = PreTransaction
+Exec = /usr/lib/fenrir/fenrir-update-guard start

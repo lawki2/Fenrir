@@ -13,6 +13,7 @@ import qs.modules.nexus.pages.bluetooth
 import qs.modules.nexus.pages.desktop
 import qs.modules.nexus.pages.firewall
 import qs.modules.nexus.pages.keybinds
+import qs.modules.nexus.pages.lookandfeel
 import qs.modules.nexus.pages.monitors
 import qs.modules.nexus.pages.network
 import qs.modules.nexus.pages.nightlight
@@ -29,9 +30,8 @@ QtObject {
     id: root
 
     readonly property list<Component> pageComps: [
-        // Appearance
+        // Personalise
         Component {
-            // Wallpaper & style
             StackPage {
                 Component {
                     WallpaperAndStyle {}
@@ -48,123 +48,20 @@ QtObject {
             }
         },
         Component {
-            // Desktop
+            StackPage {
+                Component {
+                    LookAndFeelPage {}
+                }
+            }
+        },
+        Component {
             StackPage {
                 Component {
                     DesktopPage {}
                 }
             }
         },
-
-        // Connectivity
         Component {
-            // Display
-            StackPage {
-                Component {
-                    MonitorsPage {}
-                }
-            }
-        },
-        Component {
-            // Night light
-            StackPage {
-                Component {
-                    NightLightPage {}
-                }
-            }
-        },
-        Component {
-            // Network
-            StackPage {
-                Component {
-                    NetworkPage {}
-                }
-                Component {
-                    EthernetDetailPage {}
-                }
-                Component {
-                    AddNetworkPage {}
-                }
-                Component {
-                    NetworkDetailPage {}
-                }
-                Component {
-                    AddVpnPage {}
-                }
-                Component {
-                    AllNetworksPage {}
-                }
-                Component {
-                    SavedNetworksPage {}
-                }
-            }
-        },
-        Component {
-            // Firewall
-            StackPage {
-                Component {
-                    FirewallPage {}
-                }
-            }
-        },
-        Component {
-            // Bluetooth
-            StackPage {
-                Component {
-                    BluetoothPage {}
-                }
-                Component {
-                    BtDeviceInfo {}
-                }
-                Component {
-                    BluetoothPairing {}
-                }
-            }
-        },
-        Component {
-            // Printers
-            StackPage {
-                Component {
-                    PrintersPage {}
-                }
-            }
-        },
-        Component {
-            // Audio
-            StackPage {
-                Component {
-                    AudioPage {}
-                }
-                Component {
-                    AppVolumes {}
-                }
-            }
-        },
-
-        // System
-        Component {
-            // Power & sleep
-            StackPage {
-                Component {
-                    PowerPage {}
-                }
-            }
-        },
-        Component {
-            // Updates
-            StackPage {
-                Component {
-                    UpdatesPage {}
-                }
-            }
-        },
-        Component {
-            PlaceholderComp {}
-        },
-
-        // Shell
-        Component {
-            // Panels
             StackPage {
                 Component {
                     PanelsPage {}
@@ -203,8 +100,91 @@ QtObject {
                 }
             }
         },
+
+        // Display
         Component {
-            // Keybinds
+            StackPage {
+                Component {
+                    MonitorsPage {}
+                }
+            }
+        },
+        Component {
+            StackPage {
+                Component {
+                    NightLightPage {}
+                }
+            }
+        },
+
+        // Network
+        Component {
+            StackPage {
+                Component {
+                    NetworkPage {}
+                }
+                Component {
+                    EthernetDetailPage {}
+                }
+                Component {
+                    AddNetworkPage {}
+                }
+                Component {
+                    NetworkDetailPage {}
+                }
+                Component {
+                    AddVpnPage {}
+                }
+                Component {
+                    AllNetworksPage {}
+                }
+                Component {
+                    SavedNetworksPage {}
+                }
+            }
+        },
+        Component {
+            StackPage {
+                Component {
+                    FirewallPage {}
+                }
+            }
+        },
+
+        // Devices
+        Component {
+            StackPage {
+                Component {
+                    BluetoothPage {}
+                }
+                Component {
+                    BtDeviceInfo {}
+                }
+                Component {
+                    BluetoothPairing {}
+                }
+            }
+        },
+        Component {
+            StackPage {
+                Component {
+                    AudioPage {}
+                }
+                Component {
+                    AppVolumes {}
+                }
+            }
+        },
+        Component {
+            StackPage {
+                Component {
+                    PrintersPage {}
+                }
+            }
+        },
+
+        // Input
+        Component {
             StackPage {
                 Component {
                     KeybindsPage {}
@@ -212,7 +192,21 @@ QtObject {
             }
         },
         Component {
-            // Apps
+            StackPage {
+                Component {
+                    LanguageAndRegion {}
+                }
+                Component {
+                    LayoutPicker {}
+                }
+                Component {
+                    TimezonePicker {}
+                }
+            }
+        },
+
+        // Apps
+        Component {
             StackPage {
                 Component {
                     AppsPage {}
@@ -226,27 +220,39 @@ QtObject {
             }
         },
         Component {
-            // Services
             StackPage {
                 Component {
-                    ServicesPage {}
+                    NotificationsPage {
+                        isSubPage: false
+                    }
                 }
+            }
+        },
+
+        // System
+        Component {
+            StackPage {
                 Component {
-                    NotificationsPage {}
+                    PowerPage {}
                 }
             }
         },
         Component {
-            // Language & region
             StackPage {
                 Component {
-                    LanguageAndRegion {}
+                    UpdatesPage {}
+                }
+            }
+        },
+        Component {
+            StackPage {
+                Component {
+                    ServicesPage {
+                        title: qsTr("Advanced")
+                    }
                 }
                 Component {
-                    LayoutPicker {}
-                }
-                Component {
-                    TimezonePicker {}
+                    NotificationsPage {}
                 }
             }
         },

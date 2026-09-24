@@ -28,11 +28,11 @@ declare -A spliced_inputs=(
     [caelestia-cli]="assets/schemes/fenrir"
 )
 
-# Bump to rebuild against updated deps at an unchanged upstream version; it is
-# appended to pkgrel, so 2.3.0-1 becomes 2.3.0-1.1 and pacman sees it as newer.
+# Bump to force a rebuild against updated deps at an unchanged upstream version. For the
+# spliced packages the version comes from the build time instead, see build_one.
 declare -A fenrir_rebuild=(
     [caelestia-cli]=1
-    [caelestia-shell]=8
+    [caelestia-shell]=11
 )
 
 # Fenrir's own packages whose pkgver is the build time, so each rebuild reaches -Syu as an update.
@@ -122,7 +122,11 @@ build_one() {
         cp -r "$src"/* "$build_root"/
     fi
 
-    if (( rebuild > 0 )); then
+    if [[ -n "${spliced_inputs[$pkg]:-}" ]]; then
+        # Fenrir's changes don't move upstream's version, so every build gets a newer pkgrel of
+        # its own; a hand-bumped counter let an ISO and a later publish share one version.
+        sed -i -E "s/^pkgrel=([0-9]+)(\.[0-9]+)*\$/pkgrel=\1.$(date +%Y%m%d%H%M)/" "$build_root/PKGBUILD"
+    elif (( rebuild > 0 )); then
         sed -i -E "s/^pkgrel=([0-9]+(\.[0-9]+)*)\$/pkgrel=\1.${rebuild}/" "$build_root/PKGBUILD"
     fi
 

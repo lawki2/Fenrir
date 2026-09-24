@@ -92,5 +92,25 @@ Singleton {
         onTriggered: root.readFiles()
     }
 
+    // Called by fenrir-settings' pacman hooks (fenrir-update-guard) around any transaction that
+    // changes shell files, whether it came from the Updates page or a terminal.
+    IpcHandler {
+        function pause(): void {
+            Quickshell.watchFiles = false;
+        }
+
+        function reload(): void {
+            Quickshell.watchFiles = true;
+            Quickshell.reload(true);
+        }
+
+        // Starts the new shell only once this one is gone; `caelestia shell -d` won't start beside it.
+        function restart(): void {
+            Quickshell.execDetached(["sh", "-c", "qs -c caelestia kill; for i in $(seq 50); do qs -c caelestia list 2>/dev/null | grep -q '^Instance' || break; sleep 0.1; done; caelestia shell -d"]);
+        }
+
+        target: "fenrirUpdates"
+    }
+
     Component.onCompleted: root.readFiles()
 }

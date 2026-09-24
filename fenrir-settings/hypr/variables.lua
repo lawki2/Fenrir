@@ -49,6 +49,10 @@ return {
     activeWindowBorderColour   = "rgba(" .. scheme.primary .. "e6)",
     inactiveWindowBorderColour = "rgba(" .. scheme.onSurfaceVariant .. "11)",
 
+    -- Animations (Fenrir); speed is a multiplier, 2 = twice as fast
+    animationsEnabled          = true,
+    animationSpeed             = 1,
+
     -- Misc
     volumeStep                 = 10,
     volumeMax                  = 100,
