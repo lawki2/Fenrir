@@ -30,10 +30,8 @@ import qs.modules.nexus.pages.panels.taskbar
 QtObject {
     id: root
 
-    readonly property list<Component> pageComps: allComps.filter((_, i) => PageRegistry.shown(PageRegistry.allPages[i]))
-
-    // Same order as PageRegistry.allPages.
-    readonly property list<Component> allComps: [
+    // Same order as PageRegistry.pages.
+    readonly property list<Component> pageComps: [
         // Personalise
         Component {
             StackPage {

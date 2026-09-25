@@ -8,7 +8,7 @@ import qs.components.controls
 import qs.services
 import qs.modules.nexus.common
 
-// Everything here is a Hyprland variable saved through HyprVars; Nexus lists the page on laptops only.
+// Everything here is a Hyprland variable saved through HyprVars; touchpad and gestures show on laptops only.
 PageBase {
     id: root
 
@@ -36,7 +36,7 @@ PageBase {
         commit.restart();
     }
 
-    title: qsTr("Mouse & touchpad")
+    title: Chassis.isLaptop ? qsTr("Mouse & touchpad") : qsTr("Mouse")
 
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -83,96 +83,102 @@ PageBase {
                 })
         }
 
-        SectionHeader {
-            text: qsTr("Touchpad")
-        }
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: Chassis.isLaptop
+            spacing: Tokens.spacing.extraSmall / 2
 
-        SliderRow {
-            first: true
-            icon: "swipe_vertical"
-            label: qsTr("Scrolling speed")
-            value: (root.hypr("touchpadScrollFactor") - 0.2) / 1.8
-            valueLabel: `${root.hypr("touchpadScrollFactor").toFixed(1)}×`
-            onMoved: v => root.stage({
-                    touchpadScrollFactor: Math.round((0.2 + v * 1.8) * 10) / 10
-                })
-        }
-
-        ToggleRow {
-            text: qsTr("Natural scrolling")
-            subtext: qsTr("The page follows your fingers")
-            checked: root.hypr("touchpadNaturalScroll")
-            onToggled: HyprVars.set({
-                    touchpadNaturalScroll: checked
-                })
-        }
-
-        ToggleRow {
-            text: qsTr("Tap to click")
-            subtext: qsTr("A two-finger tap right-clicks")
-            checked: root.hypr("touchpadTapToClick")
-            onToggled: HyprVars.set({
-                    touchpadTapToClick: checked
-                })
-        }
-
-        ToggleRow {
-            text: qsTr("Two-finger right-click")
-            subtext: root.hypr("touchpadClickFinger") ? qsTr("Press down with two fingers to right-click") : qsTr("Press the bottom-right corner to right-click")
-            checked: root.hypr("touchpadClickFinger")
-            onToggled: HyprVars.set({
-                    touchpadClickFinger: checked
-                })
-        }
-
-        ToggleRow {
-            last: true
-            text: qsTr("Ignore while typing")
-            subtext: qsTr("Stops a resting palm from moving the pointer")
-            checked: root.hypr("touchpadDisableTyping")
-            onToggled: HyprVars.set({
-                    touchpadDisableTyping: checked
-                })
-        }
-
-        SectionHeader {
-            text: qsTr("Gestures")
-        }
-
-        // The scratchpad swipes take whichever count this leaves free.
-        SelectRow {
-            first: true
-            label: qsTr("Swipe with")
-            subtext: qsTr("For workspaces and the launcher")
-            menuItems: root.fingerItems
-            active: root.fingerItems[root.swipeFingers - 3] ?? null
-            fallbackText: qsTr("%1 fingers").arg(root.swipeFingers)
-            onSelected: item => {
-                const fingers = root.fingerItems.indexOf(item) + 3;
-                HyprVars.set({
-                    workspaceSwipeFingers: fingers,
-                    gestureFingers: fingers === 3 ? 4 : 3
-                });
+            SectionHeader {
+                text: qsTr("Touchpad")
             }
-        }
 
-        InfoRow {
-            icon: "swipe"
-            label: qsTr("Switch workspace")
-            value: qsTr("%1 fingers left or right").arg(root.swipeFingers)
-        }
+            SliderRow {
+                first: true
+                icon: "swipe_vertical"
+                label: qsTr("Scrolling speed")
+                value: (root.hypr("touchpadScrollFactor") - 0.2) / 1.8
+                valueLabel: `${root.hypr("touchpadScrollFactor").toFixed(1)}×`
+                onMoved: v => root.stage({
+                        touchpadScrollFactor: Math.round((0.2 + v * 1.8) * 10) / 10
+                    })
+            }
 
-        InfoRow {
-            icon: "swipe_up"
-            label: qsTr("Open or close the launcher")
-            value: qsTr("%1 fingers up or down").arg(root.swipeFingers)
-        }
+            ToggleRow {
+                text: qsTr("Natural scrolling")
+                subtext: qsTr("The page follows your fingers")
+                checked: root.hypr("touchpadNaturalScroll")
+                onToggled: HyprVars.set({
+                        touchpadNaturalScroll: checked
+                    })
+            }
 
-        InfoRow {
-            last: true
-            icon: "swipe_vertical"
-            label: qsTr("Show or hide the scratchpad")
-            value: qsTr("%1 fingers up or down").arg(root.otherFingers)
+            ToggleRow {
+                text: qsTr("Tap to click")
+                subtext: qsTr("A two-finger tap right-clicks")
+                checked: root.hypr("touchpadTapToClick")
+                onToggled: HyprVars.set({
+                        touchpadTapToClick: checked
+                    })
+            }
+
+            ToggleRow {
+                text: qsTr("Two-finger right-click")
+                subtext: root.hypr("touchpadClickFinger") ? qsTr("Press down with two fingers to right-click") : qsTr("Press the bottom-right corner to right-click")
+                checked: root.hypr("touchpadClickFinger")
+                onToggled: HyprVars.set({
+                        touchpadClickFinger: checked
+                    })
+            }
+
+            ToggleRow {
+                last: true
+                text: qsTr("Ignore while typing")
+                subtext: qsTr("Stops a resting palm from moving the pointer")
+                checked: root.hypr("touchpadDisableTyping")
+                onToggled: HyprVars.set({
+                        touchpadDisableTyping: checked
+                    })
+            }
+
+            SectionHeader {
+                text: qsTr("Gestures")
+            }
+
+            // The scratchpad swipes take whichever count this leaves free.
+            SelectRow {
+                first: true
+                label: qsTr("Swipe with")
+                subtext: qsTr("For workspaces and the launcher")
+                menuItems: root.fingerItems
+                active: root.fingerItems[root.swipeFingers - 3] ?? null
+                fallbackText: qsTr("%1 fingers").arg(root.swipeFingers)
+                onSelected: item => {
+                    const fingers = root.fingerItems.indexOf(item) + 3;
+                    HyprVars.set({
+                        workspaceSwipeFingers: fingers,
+                        gestureFingers: fingers === 3 ? 4 : 3
+                    });
+                }
+            }
+
+            InfoRow {
+                icon: "swipe"
+                label: qsTr("Switch workspace")
+                value: qsTr("%1 fingers left or right").arg(root.swipeFingers)
+            }
+
+            InfoRow {
+                icon: "swipe_up"
+                label: qsTr("Open or close the launcher")
+                value: qsTr("%1 fingers up or down").arg(root.swipeFingers)
+            }
+
+            InfoRow {
+                last: true
+                icon: "swipe_vertical"
+                label: qsTr("Show or hide the scratchpad")
+                value: qsTr("%1 fingers up or down").arg(root.otherFingers)
+            }
         }
 
         RowButton {

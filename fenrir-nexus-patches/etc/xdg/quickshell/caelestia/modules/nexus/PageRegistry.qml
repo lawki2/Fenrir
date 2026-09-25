@@ -6,15 +6,20 @@ import qs.services
 QtObject {
     id: root
 
-    // What Nexus lists; PageCompRegistry filters its pages the same way, so the two stay index-aligned.
-    readonly property list<var> pages: allPages.filter(p => root.shown(p))
-
-    function shown(page: var): bool {
-        return !page.laptopOnly || Chassis.isLaptop;
-    }
+    // Fenrir: the sidebar's collapsible groups, in order; a group with one page shows just that page.
+    readonly property list<var> categories: [
+        { id: "personalise", label: qsTr("Personalise"), icon: "brush" },
+        { id: "display", label: qsTr("Screen"), icon: "desktop_windows" },
+        { id: "network", label: qsTr("Connectivity"), icon: "lan" },
+        { id: "devices", label: qsTr("Devices"), icon: "devices" },
+        { id: "input", label: qsTr("Input & language"), icon: "keyboard_alt" },
+        { id: "apps", label: qsTr("Apps & notifications"), icon: "grid_view" },
+        { id: "system", label: qsTr("System"), icon: "settings" },
+        { id: "about", label: qsTr("About"), icon: "info" }
+    ]
 
     // popout: the bar popout mode that opens this page (bar/popouts/Wrapper.qml).
-    readonly property list<var> allPages: [
+    readonly property list<var> pages: [
         // Personalise
         {
             label: qsTr("Wallpaper & style"),
@@ -96,11 +101,10 @@ QtObject {
 
         // Input
         {
-            label: qsTr("Mouse & touchpad"),
-            icon: "touchpad_mouse",
-            description: qsTr("Pointer speed, scrolling, gestures"),
-            category: "input",
-            laptopOnly: true
+            label: Chassis.isLaptop ? qsTr("Mouse & touchpad") : qsTr("Mouse"),
+            icon: Chassis.isLaptop ? "touchpad_mouse" : "mouse",
+            description: Chassis.isLaptop ? qsTr("Pointer speed, scrolling, gestures") : qsTr("Pointer speed, scroll direction"),
+            category: "input"
         },
         {
             label: qsTr("Keybinds"),
