@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import Quickshell.Io
 import Caelestia.Config
 import qs.components
@@ -21,32 +20,12 @@ PageBase {
     title: qsTr("Add layout")
     isSubPage: true
 
-    function parseHyprVars(text: string): var {
-        const result = {};
-        const re = /(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
-        let match;
-        while ((match = re.exec(text)) !== null)
-            result[match[1]] = match[2];
-        return result;
-    }
-
-    function serializeHyprVars(data: var): string {
-        const keys = Object.keys(data);
-        if (!keys.length)
-            return "return {}\n";
-        const lines = keys.map(k => `    ${k} = "${data[k]}",`);
-        return `return {\n${lines.join("\n")}\n}\n`;
-    }
-
     function addLayout(code: string): void {
-        const data = root.parseHyprVars(hyprVarsFile.text());
-        const current = (data["kbLayout"] ?? "us").split(",").filter(l => l.length > 0);
-        if (current.indexOf(code) < 0) {
-            current.push(code);
-            data["kbLayout"] = current.join(",");
-            hyprVarsFile.setText(root.serializeHyprVars(data));
-            Hypr.extras.batchMessage(["reload"]);
-        }
+        const current = String(HyprVars.value("kbLayout") ?? "us").split(",").filter(l => l.length > 0);
+        if (current.indexOf(code) < 0)
+            HyprVars.set({
+                kbLayout: current.concat([code]).join(",")
+            });
         root.nState.closeSubPage();
     }
 
@@ -55,17 +34,6 @@ PageBase {
         anchors.top: parent.top
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
-
-        FileView {
-            id: hyprVarsFile
-
-            path: `${Quickshell.env("HOME")}/.config/caelestia/hypr-vars.lua`
-            printErrors: false
-            onLoadFailed: error => {
-                if (error === FileViewError.FileNotFound)
-                    Qt.callLater(() => setText("return {}\n"));
-            }
-        }
 
         // Only runs when this sub-page is opened, not on shell startup.
         Process {

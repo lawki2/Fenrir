@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Caelestia.Components
 import Caelestia.Config
 import qs.components
 import qs.components.controls
@@ -52,6 +53,11 @@ PageBase {
 
     property bool hyprUserHasForeignRules: false
     property bool nexusBlockPresent: false
+
+    // The layout to go back to while a mode change awaits "Keep"; nothing is saved until then.
+    property var revertList: null
+    readonly property int confirmSeconds: 15
+    property int countdown: 0
 
     readonly property bool hasOverlap: root.monitorList.some(m => root.monitorList.some(o => o.name !== m.name && o.x < m.x + m.lw && o.x + o.lw > m.x && o.y < m.y + m.lh && o.y + o.lh > m.y))
 
@@ -144,6 +150,7 @@ PageBase {
         const old = root.selected;
         if (!old)
             return;
+        const before = root.monitorList;
         const next = root.withSize(Object.assign({}, old, changes));
         const dx = next.lw - old.lw;
         const dy = next.lh - old.lh;
@@ -157,7 +164,7 @@ PageBase {
                 moved.y += dy;
             return moved;
         });
-        root.apply();
+        root.apply(before);
     }
 
     function setResolution(width: real, height: real): void {
@@ -182,7 +189,7 @@ PageBase {
         root.monitorList = root.monitorList.map(m => Object.assign({}, m, {
                 primary: m.name === name
             }));
-        root.apply();
+        root.apply(null);
     }
 
     function setPosition(name: string, x: real, y: real): void {
@@ -190,7 +197,7 @@ PageBase {
                 x,
                 y
             }) : m);
-        root.apply();
+        root.apply(null);
     }
 
     // Real position -> Lua `monitor=` string, e.g. "2560x1440@144.00"
@@ -211,11 +218,35 @@ PageBase {
         return `return {\n${lines.join("\n")}\n}\n`;
     }
 
-    function apply(): void {
+    // A mode change can leave a screen blank, so it only sticks once confirmed; moving a display can't.
+    function apply(before: var): void {
         if (root.hasOverlap)
             return;
+        root.applyLive(root.monitorList);
+        if (before && !root.revertList)
+            root.revertList = before;
+        if (root.revertList) {
+            root.countdown = root.confirmSeconds;
+            confirmTimer.restart();
+        } else {
+            root.persist(root.monitorList);
+        }
+    }
 
-        const list = root.monitorList;
+    function keep(): void {
+        confirmTimer.stop();
+        root.revertList = null;
+        root.persist(root.monitorList);
+    }
+
+    function revert(): void {
+        confirmTimer.stop();
+        root.monitorList = root.revertList;
+        root.revertList = null;
+        root.applyLive(root.monitorList);
+    }
+
+    function applyLive(list: var): void {
         const primary = list.find(m => m.primary) ?? list[0];
         const ox = primary ? primary.x : 0;
         const oy = primary ? primary.y : 0;
@@ -226,7 +257,9 @@ PageBase {
             return `eval hl.monitor({ output = "${m.name}", mode = "${root.modeString(m)}", position = "${x}x${y}", scale = ${m.scale}, transform = ${m.transform} })`;
         });
         Hypr.extras.batchMessage(evalCalls);
+    }
 
+    function persist(list: var): void {
         monitorsLuaFile.setText(root.serializeLua(list));
         root.ensureHyprUserBlock();
     }
@@ -260,6 +293,11 @@ PageBase {
         root.checkHyprUserState();
     }
 
+    Component.onDestruction: {
+        if (root.revertList)
+            root.revert();
+    }
+
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
@@ -270,6 +308,73 @@ PageBase {
             id: menuItemComp
 
             MenuItem {}
+        }
+
+        StyledRect {
+            visible: root.revertList !== null
+            Layout.fillWidth: true
+            implicitHeight: confirmLayout.implicitHeight + Tokens.padding.large * 2
+            radius: Tokens.rounding.large
+            color: Colours.palette.m3secondaryContainer
+
+            ColumnLayout {
+                id: confirmLayout
+
+                anchors.fill: parent
+                anchors.margins: Tokens.padding.large
+                spacing: Tokens.spacing.small
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: qsTr("Keep these display settings?")
+                    color: Colours.palette.m3onSecondaryContainer
+                    font: Tokens.font.title.small
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: root.countdown === 1 ? qsTr("Going back to the previous settings in 1 second") : qsTr("Going back to the previous settings in %1 seconds").arg(root.countdown)
+                    color: Colours.palette.m3onSecondaryContainer
+                    font: Tokens.font.body.small
+                    wrapMode: Text.WordWrap
+                }
+
+                ButtonRow {
+                    Layout.topMargin: Tokens.spacing.small
+                    spacing: Tokens.spacing.small
+
+                    TextButton {
+                        isRound: true
+                        shapeMorph: true
+                        horizontalPadding: Tokens.padding.extraLarge
+                        verticalPadding: Tokens.padding.medium
+                        type: TextButton.Tonal
+                        text: qsTr("Revert")
+                        onClicked: root.revert()
+                    }
+
+                    TextButton {
+                        isRound: true
+                        shapeMorph: true
+                        horizontalPadding: Tokens.padding.extraLarge
+                        verticalPadding: Tokens.padding.medium
+                        text: qsTr("Keep")
+                        onClicked: root.keep()
+                    }
+                }
+            }
+        }
+
+        Timer {
+            id: confirmTimer
+
+            interval: 1000
+            repeat: true
+            onTriggered: {
+                root.countdown--;
+                if (root.countdown <= 0)
+                    root.revert();
+            }
         }
 
         FileView {

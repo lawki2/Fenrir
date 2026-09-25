@@ -303,21 +303,24 @@ PageBase {
                         font: Tokens.font.label.small
                     }
 
-                    // Default policies are changed with the toggle above, not
-                    // deleted, so they get no delete affordance.
-                    StateLayer {
+                    // Default policies are changed with the toggle above, so they get no delete button.
+                    // StateLayer fills its parent, so this Item keeps it to the button's size.
+                    Item {
                         visible: ruleRow.modelData.kind !== "default"
-                        implicitWidth: visible ? 32 : 0
+                        implicitWidth: 32
                         implicitHeight: 32
-                        radius: height / 2
-                        disabled: changeProc.running || reloadProc.running
-                        onClicked: root.removeRow(ruleRow.modelData)
 
-                        MaterialIcon {
-                            anchors.centerIn: parent
-                            text: "delete"
-                            color: Colours.palette.m3error
-                            fontStyle: Tokens.font.icon.small
+                        StateLayer {
+                            radius: height / 2
+                            disabled: changeProc.running || reloadProc.running
+                            onClicked: root.removeRow(ruleRow.modelData)
+
+                            MaterialIcon {
+                                anchors.centerIn: parent
+                                text: "delete"
+                                color: Colours.palette.m3error
+                                fontStyle: Tokens.font.icon.small
+                            }
                         }
                     }
                 }

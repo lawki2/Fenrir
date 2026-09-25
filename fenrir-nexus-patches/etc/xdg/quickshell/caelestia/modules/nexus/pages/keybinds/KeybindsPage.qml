@@ -22,28 +22,32 @@ PageBase {
             category: qsTr("Workspaces"),
             label: qsTr("Switch workspace"),
             subtext: qsTr("Held with a number key (1-0)"),
-            default: "SUPER"
+            default: "SUPER",
+            modifiersOnly: true
         },
         {
             id: "kbMoveWinToWs",
             category: qsTr("Workspaces"),
             label: qsTr("Move window to workspace"),
             subtext: qsTr("Held with a number key (1-0)"),
-            default: "SUPER + ALT"
+            default: "SUPER + ALT",
+            modifiersOnly: true
         },
         {
             id: "kbGoToWsGroup",
             category: qsTr("Workspaces"),
             label: qsTr("Switch workspace group"),
             subtext: qsTr("Held with a number key (1-0)"),
-            default: "CTRL + SUPER"
+            default: "CTRL + SUPER",
+            modifiersOnly: true
         },
         {
             id: "kbMoveWinToWsGroup",
             category: qsTr("Workspaces"),
             label: qsTr("Move window to workspace group"),
             subtext: qsTr("Held with a number key (1-0)"),
-            default: "CTRL + SUPER + ALT"
+            default: "CTRL + SUPER + ALT",
+            modifiersOnly: true
         },
         {
             id: "kbNextWs",
@@ -307,6 +311,7 @@ PageBase {
                     subtext: group.modelData.subtext ?? ""
                     value: root.currentValue(group.modelData)
                     conflict: root.conflictsFor(group.modelData)
+                    modifiersOnly: group.modelData.modifiersOnly ?? false
                     onChanged: newValue => root.rebind(group.modelData.id, newValue)
                 }
             }

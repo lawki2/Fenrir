@@ -60,9 +60,9 @@ return {
     -- Misc
     volumeStep                 = 10,
     volumeMax                  = 100,
-    cursorTheme                = "sweet-cursors",
+    cursorTheme                = "Sweet-cursors",
     cursorSize                 = 24,
-    -- Fenrir: hibernating needs swap on disk and installs only have zram, so fall back to suspend like the shell does.
+    -- Fenrir: falls back to plain suspend where hibernating isn't possible (no disk swap or resume= set up).
     sleepGestureCmd            = "systemctl suspend-then-hibernate || systemctl suspend",
 
     ------------------

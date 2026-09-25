@@ -17,7 +17,10 @@ Singleton {
     // checkupdates' own last line, e.g. "Cannot fetch updates".
     property string checkError: ""
     property date lastChecked
-    property list<string> updatedNames: []
+    // Package names installed or upgraded since boot, read from pacman's own database.
+    property list<string> changedSinceBoot: []
+    // pacman's database changed after the last job ended, e.g. a -Syu in a terminal.
+    property bool dbMovedOn: false
 
     // Another job (a welcome-window extra) holds pacman's lock too.
     readonly property bool busy: PkgJob.running
@@ -26,7 +29,10 @@ Singleton {
     readonly property bool succeeded: finished && PkgJob.state === "0"
     readonly property string log: PkgJob.job === "update" ? PkgJob.log : ""
     readonly property string startError: PkgJob.pending === "update" ? PkgJob.startError : ""
-    readonly property bool restartNeeded: succeeded && updatedNames.some(n => /^(linux|nvidia|systemd$|glibc$|mesa$|amd-ucode$|intel-ucode$)/.test(n))
+    // A failed job stops mattering once pacman has moved on without it.
+    readonly property bool failed: finished && !succeeded && !dbMovedOn
+    readonly property bool lockFailed: failed && /unable to lock database|could not lock database|db\.lck/.test(log)
+    readonly property bool restartNeeded: changedSinceBoot.some(n => /^(linux|nvidia|systemd$|glibc$|mesa$|amd-ucode$|intel-ucode$)/.test(n))
 
     function check(): void {
         if (root.busy || checker.running)
@@ -34,10 +40,15 @@ Singleton {
         root.checking = true;
         checker.running = true;
         firmwareChecker.running = true;
+        root.probeSystem();
+    }
+
+    function probeSystem(): void {
+        if (!root.busy)
+            systemProbe.running = true;
     }
 
     function update(): void {
-        root.updatedNames = root.packages.map(p => p.name);
         PkgJob.start(["update"]);
     }
 
@@ -74,8 +85,34 @@ Singleton {
             else if (code === 2)
                 root.packages = [];
             root.lastChecked = new Date();
-            if (before === 0 && root.packages.length > 0)
+            const key = root.packages.map(p => `${p.name} ${p.to}`).join("\n");
+            if (before === 0 && root.packages.length > 0 && key !== toasted.key) {
+                toasted.key = key;
                 Toaster.toast(qsTr("Updates available"), root.packages.length === 1 ? qsTr("1 update is ready to install in Settings") : qsTr("%1 updates are ready to install in Settings").arg(root.packages.length), "system_update");
+            }
+        }
+    }
+
+    // Survives the reloads an update causes, so the same updates aren't announced twice.
+    PersistentProperties {
+        id: toasted
+
+        property string key: ""
+
+        reloadableId: "fenrirUpdatesToast"
+    }
+
+    // Directory mtimes in pacman's local db are install times, whatever language pacman prints in.
+    Process {
+        id: systemProbe
+
+        command: ["sh", "-c", "since=$(uptime -s) && find /var/lib/pacman/local -mindepth 1 -maxdepth 1 -newermt \"$since\" -printf '%f\\n'; [ /var/lib/pacman/local -nt /run/fenrir-pkg/state ] && echo @moved"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const lines = text.split("\n").filter(l => l.length > 0);
+                root.dbMovedOn = lines.includes("@moved");
+                root.changedSinceBoot = lines.filter(l => l !== "@moved").map(l => l.replace(/-[^-]+-[^-]+$/, ""));
+            }
         }
     }
 
@@ -101,12 +138,16 @@ Singleton {
 
     Connections {
         function onFinished(job: string): void {
-            if (job === "update")
+            if (job === "update") {
+                root.dbMovedOn = false;
                 root.check();
+            }
         }
 
         target: PkgJob
     }
+
+    Component.onCompleted: root.probeSystem()
 
     // First check a minute after login, then every six hours.
     Timer {

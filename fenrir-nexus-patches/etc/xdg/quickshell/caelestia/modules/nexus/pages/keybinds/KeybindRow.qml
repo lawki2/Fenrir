@@ -2,6 +2,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
+import Quickshell.Wayland
 import Caelestia.Config
 import qs.components
 import qs.services
@@ -16,6 +18,8 @@ ConnectedRect {
     property string subtext
     property string value
     property bool conflict
+    // Workspace prefixes: keybinds.lua adds the number key, so these take modifiers alone.
+    property bool modifiersOnly
 
     signal changed(string newValue)
 
@@ -30,7 +34,8 @@ ConnectedRect {
         }
         switch (key) {
         case Qt.Key_Space: return "space";
-        case Qt.Key_Tab: return "TAB";
+        case Qt.Key_Tab:
+        case Qt.Key_Backtab: return "TAB";
         case Qt.Key_Return:
         case Qt.Key_Enter: return "Return";
         case Qt.Key_Escape: return "Escape";
@@ -148,6 +153,8 @@ ConnectedRect {
 
             property bool capturing: false
             property var heldModifiers: []
+            // Every modifier pressed since the chord began, as they're released one at a time.
+            property var chord: []
 
             Layout.preferredWidth: 190
             Layout.preferredHeight: captureText.implicitHeight + Tokens.padding.small * 2
@@ -162,6 +169,12 @@ ConnectedRect {
                 if (!captureBox.activeFocus)
                     captureBox.capturing = false;
             }
+            onCapturingChanged: {
+                captureBox.heldModifiers = [];
+                captureBox.chord = [];
+                // Assigned, not bound: the inhibitor clears its own enabled if Hyprland cancels it.
+                inhibitor.enabled = captureBox.capturing;
+            }
 
             Keys.onPressed: event => {
                 if (!captureBox.capturing)
@@ -170,16 +183,22 @@ ConnectedRect {
                 event.accepted = true;
 
                 if (root.isModifierKey(event.key)) {
-                    if (captureBox.heldModifiers.indexOf(event.key) === -1)
+                    if (captureBox.heldModifiers.indexOf(event.key) === -1) {
+                        if (!captureBox.heldModifiers.length)
+                            captureBox.chord = [];
                         captureBox.heldModifiers = captureBox.heldModifiers.concat([event.key]);
+                        captureBox.chord = captureBox.chord.concat([event.key]);
+                    }
                     return;
                 }
 
                 if (event.key === Qt.Key_Escape && event.modifiers === Qt.NoModifier) {
                     captureBox.capturing = false;
-                    captureBox.heldModifiers = [];
                     return;
                 }
+
+                if (root.modifiersOnly)
+                    return;
 
                 const name = root.keyName(event.key);
                 if (name.length === 0)
@@ -197,7 +216,6 @@ ConnectedRect {
                 parts.push(name);
 
                 captureBox.capturing = false;
-                captureBox.heldModifiers = [];
                 const combo = parts.join(" + ");
                 if (combo !== root.value)
                     root.changed(combo);
@@ -213,17 +231,12 @@ ConnectedRect {
 
                 event.accepted = true;
 
-                const heldBeforeRelease = captureBox.heldModifiers;
-                const remaining = heldBeforeRelease.filter(k => k !== event.key);
-
-                if (remaining.length > 0) {
-                    captureBox.heldModifiers = remaining;
+                captureBox.heldModifiers = captureBox.heldModifiers.filter(k => k !== event.key);
+                if (captureBox.heldModifiers.length > 0 || !root.modifiersOnly)
                     return;
-                }
 
+                const combo = root.orderedModifierNames(captureBox.chord).join(" + ");
                 captureBox.capturing = false;
-                captureBox.heldModifiers = [];
-                const combo = root.orderedModifierNames(heldBeforeRelease).join(" + ");
                 if (combo.length > 0 && combo !== root.value)
                     root.changed(combo);
             }
@@ -231,9 +244,16 @@ ConnectedRect {
             StyledText {
                 id: captureText
                 anchors.centerIn: parent
-                text: captureBox.capturing ? qsTr("Press a key…") : root.value
+                text: captureBox.capturing ? (root.modifiersOnly ? qsTr("Press modifiers…") : qsTr("Press a key…")) : root.value
                 color: captureBox.capturing ? Colours.palette.m3primary : Colours.palette.m3onSurface
                 font: Tokens.font.body.small
+            }
+
+            // Lets combos Hyprland already binds (SUPER opens the launcher) reach the capture.
+            ShortcutInhibitor {
+                id: inhibitor
+
+                window: captureBox.QsWindow.window
             }
 
             MouseArea {

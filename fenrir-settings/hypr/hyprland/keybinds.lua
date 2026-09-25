@@ -178,7 +178,10 @@ hl.bind("SUPER + SHIFT + L", hl.dsp.exec_cmd(vars.sleepGestureCmd), { locked = t
 hl.bind(vars.kbClipboard, hl.dsp.exec_cmd("pkill fuzzel || caelestia clipboard"))
 hl.bind("SUPER + ALT + V", hl.dsp.exec_cmd("pkill fuzzel || caelestia clipboard -d"))
 hl.bind(vars.kbEmoji, hl.dsp.exec_cmd("pkill fuzzel || caelestia emoji -p"))
-hl.bind(vars.kbSwitchLayout, hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))
+-- Fenrir: only with more than one layout, so Ctrl+Space stays free for apps otherwise
+if vars.kbLayout:find(",") then
+    hl.bind(vars.kbSwitchLayout, hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))
+end
 hl.bind(
     "CTRL + SHIFT + ALT + V",
     hl.dsp.exec_cmd('sleep 0.5s && ydotool type -d 1 "$(cliphist list | head -1 | cliphist decode)"'),

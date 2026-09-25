@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import Quickshell.Io
 import Caelestia.Config
 import qs.components
@@ -16,50 +15,21 @@ ColumnLayout {
 
     required property NexusState nState
 
-    property var overrides: ({})
     property string timezone: ""
     property bool ntpEnabled: false
     property string timeError: ""
 
-    readonly property string layouts: root.overrides["kbLayout"] ?? "us"
+    readonly property string layouts: String(HyprVars.value("kbLayout") ?? "us")
     readonly property list<string> layoutList: root.layouts.split(",").filter(l => l.length > 0)
 
-    // hypr-vars.lua is a flat `return { key = "value", ... }` table - same
-    // parse/serialize the Keybinds page uses, not a general Lua parser.
-    function parseHyprVars(text: string): var {
-        const result = {};
-        const re = /(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
-        let match;
-        while ((match = re.exec(text)) !== null)
-            result[match[1]] = match[2];
-        return result;
-    }
-
-    function serializeHyprVars(data: var): string {
-        const keys = Object.keys(data);
-        if (!keys.length)
-            return "return {}\n";
-        const lines = keys.map(k => `    ${k} = "${data[k]}",`);
-        return `return {\n${lines.join("\n")}\n}\n`;
-    }
-
-    function loadOverrides(): void {
-        root.overrides = root.parseHyprVars(hyprVarsFile.text());
-    }
-
     function removeLayout(code: string): void {
-        const current = root.layouts.split(",").filter(l => l.length > 0 && l !== code);
+        const current = root.layoutList.filter(l => l !== code);
         // Hyprland needs at least one layout.
-        if (!current.length)
-            return;
-        const data = root.parseHyprVars(hyprVarsFile.text());
-        data["kbLayout"] = current.join(",");
-        hyprVarsFile.setText(root.serializeHyprVars(data));
-        root.overrides = data;
-        Hypr.extras.batchMessage(["reload"]);
+        if (current.length)
+            HyprVars.set({
+                kbLayout: current.join(",")
+            });
     }
-
-    Component.onCompleted: root.loadOverrides()
 
     Layout.fillWidth: true
     spacing: Tokens.spacing.extraSmall / 2
@@ -68,30 +38,12 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: Tokens.spacing.extraSmall / 2
 
-        // Refresh as soon as a picker closes, rather than waiting for the
-        // page to be rebuilt on the next visit.
+        // Picks up a time zone chosen in the picker without waiting for the page to be rebuilt.
         Connections {
             target: root.nState
 
             function onSubPageClosed(): void {
-                hyprVarsFile.reload();
                 timeStateProc.running = true;
-            }
-        }
-
-        FileView {
-            id: hyprVarsFile
-
-            path: `${Quickshell.env("HOME")}/.config/caelestia/hypr-vars.lua`
-            printErrors: false
-            // The layout picker sub-page writes this file too. fileChanged
-            // only notifies - text() stays cached until reload().
-            watchChanges: true
-            onLoaded: root.loadOverrides()
-            onFileChanged: hyprVarsFile.reload()
-            onLoadFailed: error => {
-                if (error === FileViewError.FileNotFound)
-                    Qt.callLater(() => setText("return {}\n"));
             }
         }
 

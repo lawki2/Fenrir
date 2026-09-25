@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.utils
 
 // hyprsunset holds one temperature while it runs. The schedule is ours, so
 // `enabled` is always the real state the quick toggle shows.
@@ -18,17 +19,30 @@ Singleton {
     // Tracks the schedule's own last verdict, so only a transition writes to
     // enabled - a manual override then survives until the next one.
     property int lastVerdict: -1
+    // Nothing runs until the saved settings are read, so login never starts with the defaults.
+    property bool loaded: false
 
-    PersistentProperties {
-        id: props
+    FileView {
+        id: file
 
-        property bool enabled: false
-        property int temperature: 4000
-        property bool scheduleEnabled: false
-        property string startTime: "20:00"
-        property string endTime: "06:00"
+        path: `${Paths.state}/nightlight.json`
+        printErrors: false
+        onLoaded: root.start()
+        onLoadFailed: root.start()
+        onAdapterUpdated: {
+            if (root.loaded)
+                writeAdapter();
+        }
 
-        reloadableId: "nightLight"
+        JsonAdapter {
+            id: props
+
+            property bool enabled: false
+            property int temperature: 4000
+            property bool scheduleEnabled: false
+            property string startTime: "20:00"
+            property string endTime: "06:00"
+        }
     }
 
     function minutesOf(hhmm: string): int {
@@ -68,14 +82,28 @@ Singleton {
         proc.running = props.enabled;
     }
 
+    // The schedule settles `enabled` first, so hyprsunset starts at most once. Rewriting the
+    // file also creates it on first run and replaces a corrupt one with the values in use.
+    function start(): void {
+        if (root.loaded)
+            return;
+        if (props.temperature < 1000 || props.temperature > 20000)
+            props.temperature = 4000;
+        if (root.minutesOf(props.startTime) < 0)
+            props.startTime = "20:00";
+        if (root.minutesOf(props.endTime) < 0)
+            props.endTime = "06:00";
+        root.applySchedule();
+        root.loaded = true;
+        root.restart();
+        Qt.callLater(() => file.writeAdapter());
+    }
+
     // Not "running: props.enabled": if hyprsunset dies, Quickshell writes running
     // itself and silently breaks the binding.
-    onEnabledChanged: root.restart()
-    // onEnabledChanged doesn't fire for the value PersistentProperties restores
-    // at construction, so night light left on last session needs starting here.
-    Component.onCompleted: {
-        root.restart();
-        root.applySchedule();
+    onEnabledChanged: {
+        if (root.loaded)
+            root.restart();
     }
 
     // Retuned over IPC rather than restarted, which would flash. Throttled, not
@@ -94,11 +122,12 @@ Singleton {
 
     onScheduleEnabledChanged: {
         root.lastVerdict = -1;
-        root.applySchedule();
+        if (root.loaded)
+            root.applySchedule();
     }
 
     Timer {
-        running: props.scheduleEnabled
+        running: root.loaded && props.scheduleEnabled
         interval: 30000
         repeat: true
         onTriggered: root.applySchedule()

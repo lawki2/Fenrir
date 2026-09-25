@@ -11,6 +11,10 @@ Singleton {
 
     // systemd.catalog's "systemd-oomd killed one or more processes in unit" entry.
     readonly property string killMessageId: "d989611b15e44c9dbf31e3c81256e4ed"
+    // Not --user: a volatile journal (the live ISO) has no per-user files, so match our uid instead.
+    readonly property string uid: (Quickshell.env("XDG_RUNTIME_DIR") ?? "").match(/^\/run\/user\/(\d+)$/)?.[1] ?? ""
+    property int retryMs: 5000
+    property real startedAt: 0
 
     // Handles app2unit's app-<desktop>-<app>-<random>.scope and <app>@<random>.service, and
     // app-<app>-<pid>.scope as apps like Chromium make themselves.
@@ -36,7 +40,7 @@ Singleton {
         id: journal
 
         running: true
-        command: ["journalctl", "--user", "--follow", "--lines=0", "--output=json", `MESSAGE_ID=${root.killMessageId}`]
+        command: ["journalctl", "--follow", "--lines=0", "--output=json", `MESSAGE_ID=${root.killMessageId}`, root.uid ? `_UID=${root.uid}` : "--user"]
         stdout: SplitParser {
             onRead: line => {
                 try {
@@ -45,14 +49,22 @@ Singleton {
                 } catch (e) {}
             }
         }
-        // journalctl only exits if the journal went away underneath it.
-        onExited: restart.start()
+        onStarted: root.startedAt = Date.now()
+        // journalctl only exits if the journal went away underneath it, or never had one to read.
+        onExited: {
+            if (Date.now() - root.startedAt > 60000)
+                root.retryMs = 5000;
+            restart.start();
+        }
     }
 
     Timer {
         id: restart
 
-        interval: 5000
-        onTriggered: journal.running = true
+        interval: root.retryMs
+        onTriggered: {
+            journal.running = true;
+            root.retryMs = Math.min(root.retryMs * 2, 300000);
+        }
     }
 }

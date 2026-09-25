@@ -19,7 +19,9 @@ PageBase {
             return qsTr("Updating…");
         if (Updates.busy)
             return qsTr("Waiting for another install to finish…");
-        if (Updates.finished && !Updates.succeeded)
+        if (Updates.lockFailed)
+            return qsTr("Another program is using pacman");
+        if (Updates.failed)
             return qsTr("The update stopped");
         if (Updates.checking)
             return qsTr("Checking for updates…");
@@ -35,6 +37,8 @@ PageBase {
     Component.onCompleted: {
         if (!Updates.lastChecked.getTime())
             Updates.check();
+        else
+            Updates.probeSystem();
     }
 
     ColumnLayout {
@@ -58,6 +62,15 @@ PageBase {
         }
 
         StyledText {
+            visible: Updates.lockFailed
+            Layout.fillWidth: true
+            text: qsTr("pacman is already busy, maybe in a terminal. Try again once it finishes. If nothing else is running, a crash may have left /var/lib/pacman/db.lck behind.")
+            color: Colours.palette.m3error
+            font: Tokens.font.body.small
+            wrapMode: Text.WordWrap
+        }
+
+        StyledText {
             Layout.bottomMargin: Tokens.spacing.medium
             visible: Updates.lastChecked.getTime() > 0
             text: qsTr("Last checked %1").arg(Qt.formatTime(Updates.lastChecked, "hh:mm"))
@@ -75,7 +88,7 @@ PageBase {
         }
 
         RowButton {
-            last: !(Updates.finished && !Updates.succeeded) && !Updates.restartNeeded
+            last: !(Updates.failed && !Updates.lockFailed) && !Updates.restartNeeded
             icon: "refresh"
             text: qsTr("Check again")
             disabled: Updates.busy || Updates.checking
@@ -84,8 +97,8 @@ PageBase {
 
         // pacman only stops like this when it needs a person to decide, e.g. a file conflict.
         RowButton {
-            visible: Updates.finished && !Updates.succeeded
-            last: true
+            visible: Updates.failed && !Updates.lockFailed
+            last: !Updates.restartNeeded
             icon: "terminal"
             text: qsTr("Continue in terminal")
             subtext: qsTr("pacman needs you to answer something it won't guess")
@@ -110,7 +123,7 @@ PageBase {
         }
 
         StyledRect {
-            visible: Updates.running || Updates.finished
+            visible: Updates.running || Updates.succeeded || Updates.failed
             Layout.fillWidth: true
             Layout.topMargin: Tokens.spacing.medium
             implicitHeight: logText.implicitHeight + Tokens.padding.large * 2
