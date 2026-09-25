@@ -1,7 +1,20 @@
 local vars = require("variables")
 local fn   = require("hyprland.functions")
 
+-- Fenrir: only the live image has this file.
+local function live_image()
+    local f = io.open("/etc/fenrir-packages.x86_64")
+    if f then f:close() end
+    return f ~= nil
+end
+
 hl.on("hyprland.start", function()
+    -- Fenrir: the login splash, started first so it covers the shell loading in.
+    -- It holds the only lock on an autologin session, so if it can't run the session ends.
+    if not live_image() then
+        hl.exec_cmd("quickshell -c fenrir-splash || hyprctl dispatch 'hl.dsp.exit()'")
+    end
+
     -- Keyring and auth
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets")
     hl.exec_cmd("/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1")
@@ -18,15 +31,16 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("gsettings set org.gnome.desktop.interface cursor-theme " .. vars.cursorTheme)
     hl.exec_cmd("gsettings set org.gnome.desktop.interface cursor-size " .. vars.cursorSize)
 
-    -- Location provider and night light
-    hl.exec_cmd("/usr/lib/geoclue-2.0/demos/agent")
-    hl.exec_cmd("sleep 1 && gammastep")
-
     -- Forward bluetooth media commands to MPRIS
     hl.exec_cmd("mpris-proxy")
 
     -- Start shell
     hl.exec_cmd("caelestia shell -d")
+
+    -- Fenrir: the installer, on the live image
+    if live_image() then
+        hl.exec_cmd("fenrir-installer-autostart")
+    end
 end)
 
 -- Resizer listener

@@ -7,30 +7,53 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 
-// Covers the session starting up and raises the lock before uncovering. Imports
-// nothing from Caelestia, so a version bump can never wedge the login.
+// Covers the session starting up and raises the lock before uncovering. Confirms it through
+// the isSecure() call that Fenrir's Lock.qml overlay adds, so a Caelestia bump must keep it.
 ShellRoot {
     id: root
 
-    // Waits for the shell's own layer, not a timer: slow machines outlast any deadline.
     readonly property string readyLayer: "caelestia-background"
     readonly property int settleMs: 400
     readonly property int fadeMs: 700
-    // Nothing may hide the desktop indefinitely if the shell never arrives,
-    // but uncovering early would show an unlocked desktop, so wait a long time.
-    readonly property int maxWaitMs: 45000
+    readonly property int retryMs: 1000
+    // Past this without a confirmed lock the session ends; it is never uncovered unlocked.
+    readonly property int maxWaitMs: 60000
+    readonly property string sessionId: Quickshell.env("XDG_SESSION_ID") || "self"
 
     readonly property string fallback: "/etc/xdg/quickshell/caelestia/assets/wallpaper.webp"
     property string wallpaper: root.fallback
-    property bool shellReady: false
-    property bool locked: false
+    property bool shellUp: false
+    property bool secure: false
+    property bool timedOut: false
     property bool fading: false
+    // sddm's password login already authenticated the user, so only that one may uncover on timeout.
+    property bool passwordLogin: false
 
     function statePath(): string {
         const state = Quickshell.env("XDG_STATE_HOME");
         if (state && state.length > 0)
             return `${state}/caelestia/wallpaper/path.txt`;
         return `${Quickshell.env("HOME")}/.local/state/caelestia/wallpaper/path.txt`;
+    }
+
+    function requestLock(): void {
+        if (!root.secure && !root.timedOut && !lockProc.running)
+            lockProc.running = true;
+    }
+
+    function giveUp(): void {
+        root.timedOut = true;
+        if (root.passwordLogin)
+            root.fading = true;
+        else
+            root.endSession();
+    }
+
+    // Either one ends the session, and sddm (Relogin=false) then shows its password greeter.
+    function endSession(): void {
+        Hyprland.dispatch(Hyprland.usingLua ? "hl.dsp.exit()" : "exit");
+        if (!terminator.running)
+            terminator.running = true;
     }
 
     // Same file Caelestia's own Wallpapers service treats as the current
@@ -45,72 +68,89 @@ ShellRoot {
         }
     }
 
-    // Hyprland announces the shell's layer, so subscribe rather than polling
-    // hyprctl every 250ms through the slowest part of boot.
+    // Fast path only: the retry timer below still locks if this layer never opens.
     Connections {
         target: Hyprland
 
         function onRawEvent(event): void {
             if (event.name === "openlayer" && event.data === root.readyLayer)
-                root.shellReady = true;
+                root.requestLock();
         }
     }
 
-    // The event is missed if the shell came up first, so check once at start.
     Process {
-        id: shellProbe
-
         running: true
-        command: ["sh", "-c", "hyprctl layers | grep -q " + root.readyLayer]
-        onExited: code => {
-            if (code === 0)
-                root.shellReady = true;
+        command: ["loginctl", "show-session", root.sessionId, "-p", "Service", "--value"]
+        stdout: StdioCollector {
+            onStreamFinished: root.passwordLogin = text.trim() === "sddm"
         }
     }
 
+    // Exit code 0 means a caelestia instance answered, whatever it printed.
     Process {
         id: lockProc
 
-        command: ["caelestia", "shell", "lock", "lock"]
-    }
-
-    Process {
-        id: lockedProbe
-
-        command: ["sh", "-c", "caelestia shell lock isLocked | grep -q true"]
+        command: ["qs", "-c", "caelestia", "ipc", "call", "lock", "lock"]
         onExited: code => {
             if (code === 0)
-                root.locked = true;
+                root.shellUp = true;
         }
     }
 
-    // Lock before uncovering. Only ever launched on installed systems, so it
-    // always locks.
-    onShellReadyChanged: {
-        if (root.shellReady)
-            lockProc.running = true;
+    // `qs ipc call` prints "true"/"false", and exits 0 even for a missing function.
+    Process {
+        id: secureProbe
+
+        command: ["qs", "-c", "caelestia", "ipc", "call", "lock", "isSecure"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() === "true" && !root.timedOut)
+                    root.secure = true;
+            }
+        }
     }
 
     Timer {
-        running: root.shellReady && !root.locked
+        running: !root.secure && !root.timedOut
+        interval: root.retryMs
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: root.requestLock()
+    }
+
+    Timer {
+        running: root.shellUp && !root.secure && !root.timedOut
         interval: 250
         repeat: true
         onTriggered: {
-            if (!lockedProbe.running)
-                lockedProbe.running = true;
+            if (!secureProbe.running)
+                secureProbe.running = true;
         }
     }
 
     Timer {
-        running: root.locked
+        running: root.secure
         interval: root.settleMs
         onTriggered: root.fading = true
     }
 
     Timer {
-        running: true
+        running: !root.secure
         interval: root.maxWaitMs
-        onTriggered: root.fading = true
+        onTriggered: root.giveUp()
+    }
+
+    Process {
+        id: terminator
+
+        command: ["loginctl", "terminate-session", root.sessionId]
+    }
+
+    Timer {
+        running: root.timedOut && !root.fading
+        interval: 5000
+        repeat: true
+        onTriggered: root.endSession()
     }
 
     // Quits even if the fade never runs to completion.
