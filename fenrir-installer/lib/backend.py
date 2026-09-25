@@ -126,7 +126,11 @@ def _partition_paths(disk):
     return f"{disk}{sep}1", f"{disk}{sep}2"
 
 
-def partition_and_mount(disk, esp_mib, progress):
+# BIOS installs only: Limine's stage 2, in the gap before the ESP so the ESP and root keep 1 and 2.
+BIOS_PART_NUM = 3
+
+
+def partition_and_mount(disk, esp_mib, uefi, progress):
     boot_part, root_part = _partition_paths(disk)
 
     progress("Clearing any leftover mounts from a previous attempt")
@@ -142,6 +146,15 @@ def partition_and_mount(disk, esp_mib, progress):
         progress,
     )
     _stream(["sgdisk", "-n", "2:0:0", "-t", "2:8300", "-c", "2:FENRIR_ROOT", disk], progress)
+    if not uefi:
+        # With 1-sector alignment the only free block left is the gap before partition 1.
+        n = BIOS_PART_NUM
+        _stream(
+            ["sgdisk", "-a", "1", "-n", f"{n}:0:0", "-t", f"{n}:ef02", "-c", f"{n}:FENRIR_BIOS", disk],
+            progress,
+        )
+        # Some BIOSes only boot a GPT disk whose protective MBR is marked active; some UEFIs dislike it.
+        _stream(["parted", "-s", disk, "disk_set", "pmbr_boot", "on"], progress)
     _stream(["partprobe", disk], progress)
     # partprobe can return before udev creates the device nodes mkfs needs.
     _stream(["udevadm", "settle"], progress)
@@ -180,8 +193,18 @@ LIVE_ROOTFS = Path("/run/archiso/airootfs")
 # Live-only state that the clone must never carry onto a real system.
 LIVE_ONLY_PATHS = (
     "etc/fenrir-packages.x86_64",  # also marks a running live image
+    "usr/local/bin/fenrir-installer-autostart",
+    "usr/local/bin/pkexec-wrapper",
     "etc/sddm.conf.d/autologin.conf",
     "etc/mkinitcpio.conf.d/archiso.conf",
+    "etc/mkinitcpio.d/linux.preset",  # archiso's preset, pointing at the excluded archiso.conf
+    "etc/environment",  # only ZPOOL_VDEV_NAME_PATH; recreated empty after the clone
+    "etc/modules-load.d/zfs.conf",
+    "etc/systemd/system/sysinit.target.wants/systemd-time-wait-sync.service",
+    "etc/systemd/system/systemd-time-wait-sync.service.d",
+    # NetworkManager manages the network on installs.
+    "etc/systemd/system/multi-user.target.wants/systemd-networkd.service",
+    "etc/systemd/system/sockets.target.wants/systemd-networkd.socket",
     "etc/polkit-1/rules.d/49-nopasswd_global.rules",
     "etc/machine-id",
     "etc/pacman.d/gnupg",
@@ -197,8 +220,6 @@ LIVE_ONLY_PATHS = (
     "etc/systemd/system/multi-user.target.wants/sshd.service",
     "etc/ssh/sshd_config.d/10-archiso.conf",
     "etc/systemd/system/getty@tty1.service.d",
-    "etc/systemd/system/livecd-*",
-    "etc/systemd/system/*.wants/livecd-*",
     "etc/systemd/journald.conf.d/volatile-storage.conf",
     "etc/systemd/logind.conf.d/do-not-suspend.conf",
     "etc/sudoers.d/g_wheel",
@@ -210,12 +231,6 @@ LIVE_ONLY_PATHS = (
 
 def clone_live_rootfs(progress):
     """Copies the live system to disk instead of re-downloading every package."""
-    if not LIVE_ROOTFS.is_dir():
-        raise InstallError(
-            f"{LIVE_ROOTFS} is missing - the installer must run from a booted "
-            "Fenrir live image, which is what it copies onto the disk."
-        )
-
     progress("Installing packages by copying the live system")
     excludes = [f"--exclude=/{rel}" for rel in LIVE_ONLY_PATHS]
     _stream(
@@ -223,6 +238,8 @@ def clone_live_rootfs(progress):
          f"{LIVE_ROOTFS}/", f"{TARGET}/"],
         progress,
     )
+    # pam_env logs an error on every login when this file is missing.
+    (TARGET / "etc/environment").touch()
 
     # liveuser holds uid 1000; left in place it pushes the real account to 1001
     # and strands a passwordless ghost in wheel.
@@ -247,14 +264,19 @@ LIVE_ONLY_PACKAGES = (
 def remove_live_only_packages(progress):
     # Non-fatal: pacman aborts the whole transaction if anything still depends
     # on one of these, and a slightly bigger install beats a failed one.
-    progress("Removing live-only tooling")
-    proc = subprocess.run(
-        ["arch-chroot", str(TARGET), "pacman", "-Rns", "--noconfirm", *LIVE_ONLY_PACKAGES],
-        capture_output=True,
-        text=True,
-    )
-    if proc.returncode != 0:
-        progress("Note: live-only tooling could not be removed - continuing")
+    progress("Removing the installer and live-only tooling")
+    # Separate transactions, so nothing blocking the tooling can keep the installer too.
+    for args, what in (
+        (["-R", "fenrir-installer"], "the installer"),
+        (["-Rns", *LIVE_ONLY_PACKAGES], "live-only tooling"),
+    ):
+        proc = subprocess.run(
+            ["arch-chroot", str(TARGET), "pacman", *args, "--noconfirm"],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            progress(f"Note: {what} could not be removed - continuing")
 
 
 def initialize_keyring(progress):
@@ -266,21 +288,17 @@ def initialize_keyring(progress):
 
 # Public half is archiso/airootfs/etc/pacman.d/fenrir-signing-key.asc.
 FENRIR_REPO_KEY_FPR = "BE0B53BD597DF2CDB8437E869C17423CED27E4BE"
+LIVE_FENRIR_MIRRORLIST = Path("/etc/pacman.d/fenrir-mirrorlist")
+LIVE_FENRIR_KEY = Path("/etc/pacman.d/fenrir-signing-key.asc")
 
 
 def configure_fenrir_repo(progress):
     progress("Configuring the Fenrir package repository")
 
-    live_mirrorlist = Path("/etc/pacman.d/fenrir-mirrorlist")
-    live_key = Path("/etc/pacman.d/fenrir-signing-key.asc")
-    for f in (live_mirrorlist, live_key):
-        if not f.exists():
-            raise InstallError(f"{f} is missing from the live image")
-
     pacman_d = TARGET / "etc/pacman.d"
     pacman_d.mkdir(parents=True, exist_ok=True)
-    (pacman_d / "fenrir-mirrorlist").write_text(live_mirrorlist.read_text())
-    (pacman_d / "fenrir-signing-key.asc").write_text(live_key.read_text())
+    (pacman_d / "fenrir-mirrorlist").write_text(LIVE_FENRIR_MIRRORLIST.read_text())
+    (pacman_d / "fenrir-signing-key.asc").write_text(LIVE_FENRIR_KEY.read_text())
 
     pacman_conf = TARGET / "etc/pacman.conf"
     lines = pacman_conf.read_text().splitlines()
@@ -299,6 +317,47 @@ def configure_fenrir_repo(progress):
     _chroot(["sh", "-c",
              "pacman-key --add /etc/pacman.d/fenrir-signing-key.asc && "
              f"pacman-key --lsign-key {FENRIR_REPO_KEY_FPR}"], progress)
+
+
+LD_SO = "/lib/ld-linux-x86-64.so.2"
+V3_REPOS = ("cachyos-v3", "cachyos-extra-v3", "cachyos-core-v3")
+V3_MIRRORLIST = "etc/pacman.d/cachyos-v3-mirrorlist"
+
+
+def _supports_x86_64_v3(ld_help):
+    # CachyOS's own test: glibc's loader marks each hwcaps level this CPU can run.
+    return any("x86-64-v3 (supported, searched)" in line for line in ld_help.splitlines())
+
+
+def _with_v3_repos(pacman_conf):
+    """pacman.conf text with the v3 repos ahead of [cachyos], or None if they're already there."""
+    lines = pacman_conf.splitlines()
+    if any(line.strip() == f"[{V3_REPOS[0]}]" for line in lines):
+        return None
+    anchor = next((i for i, line in enumerate(lines) if line.strip() == "[cachyos]"), None)
+    if anchor is None:
+        raise InstallError("No [cachyos] section in pacman.conf to anchor the x86-64-v3 repos against")
+    block = []
+    for repo in V3_REPOS:
+        block += [
+            f"[{repo}]",
+            "Server = https://mirror.cachyos.org/repo/$arch_v3/$repo",
+            f"Include = /{V3_MIRRORLIST}",
+            "",
+        ]
+    lines[anchor:anchor] = block
+    return "\n".join(lines) + "\n"
+
+
+def configure_v3_repos(x86_64_v3, progress):
+    # The ISO carries generic x86-64 builds; CPUs that can run v3 builds get CachyOS's v3 repos.
+    if not x86_64_v3:
+        return
+    progress("Adding the x86-64-v3 package repositories")
+    pacman_conf = TARGET / "etc/pacman.conf"
+    text = _with_v3_repos(pacman_conf.read_text())
+    if text is not None:
+        pacman_conf.write_text(text)
 
 
 def genfstab_target(progress):
@@ -518,9 +577,37 @@ def configure_plymouth(progress):
     mkinitcpio_conf.write_text("\n".join(lines) + "\n")
 
 
+def _resume_hooks(hooks_line):
+    """The HOOKS= line with resume after udev; unchanged when the systemd hook resumes by itself."""
+    if re.search(r"\b(systemd|resume)\b", hooks_line):
+        return hooks_line
+    if not re.search(r"\budev\b", hooks_line):
+        raise InstallError("No systemd or udev hook in mkinitcpio.conf; can't place the resume hook")
+    return re.sub(r"\budev\b", "udev resume", hooks_line, count=1)
+
+
+def configure_resume(progress):
+    # Must precede finalize_bootloader, which regenerates the initramfs.
+    progress("Setting up resume from hibernation")
+    mkinitcpio_conf = TARGET / "etc/mkinitcpio.conf"
+    lines = mkinitcpio_conf.read_text().splitlines()
+    i = next((i for i, line in enumerate(lines) if line.startswith("HOOKS=")), None)
+    if i is None:
+        raise InstallError(f"No HOOKS= line in {mkinitcpio_conf}")
+    lines[i] = _resume_hooks(lines[i])
+    mkinitcpio_conf.write_text("\n".join(lines) + "\n")
+
+
+def _kernel_cmdline(root_uuid, resume_offset):
+    return (
+        f"rw root=UUID={root_uuid} rootflags=subvol=@ resume=UUID={root_uuid} resume_offset={resume_offset}"
+        " quiet splash loglevel=3 systemd.show_status=false rd.udev.log_level=3 vt.global_cursor_default=0\n"
+    )
+
+
 def configure_kernel_cmdline(root_part, progress):
     # Otherwise limine-entry-tool reads /proc/cmdline, which under arch-chroot is
-    # the live ISO's boot params rather than the target's.
+    # the live ISO's boot params rather than the target's. Runs after configure_swap.
     progress("Writing kernel command line")
     uuid = subprocess.run(
         ["blkid", "-s", "UUID", "-o", "value", root_part],
@@ -528,11 +615,17 @@ def configure_kernel_cmdline(root_part, progress):
         capture_output=True,
         text=True,
     ).stdout.strip()
+    offset = subprocess.run(
+        ["btrfs", "inspect-internal", "map-swapfile", "-r", str(TARGET / SWAP_FILE)],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if not uuid or not offset.isdigit():
+        raise InstallError(f"Can't locate the swap file for resume (uuid {uuid!r}, offset {offset!r})")
     kernel_dir = TARGET / "etc/kernel"
     kernel_dir.mkdir(parents=True, exist_ok=True)
-    (kernel_dir / "cmdline").write_text(
-        f"rw root=UUID={uuid} rootflags=subvol=@ quiet splash loglevel=3 systemd.show_status=false rd.udev.log_level=3 vt.global_cursor_default=0\n"
-    )
+    (kernel_dir / "cmdline").write_text(_kernel_cmdline(uuid, offset))
 
 
 BOOTLOADER_STAGE = "opt/fenrir-bootloader"
@@ -542,9 +635,7 @@ def install_bootloader_packages(progress):
     # limine is kept out of the live image (its hooks need a real ESP), so its
     # packages ride along on the ISO and are installed once the ESP is mounted.
     stage = TARGET / BOOTLOADER_STAGE
-    packages = sorted(stage.glob("*.pkg.tar.zst")) if stage.is_dir() else []
-    if not packages:
-        raise InstallError(f"No bootloader packages staged in /{BOOTLOADER_STAGE}")
+    packages = sorted(stage.glob("*.pkg.tar.zst"))
 
     progress("Installing the bootloader")
     _chroot(
@@ -560,13 +651,65 @@ def configure_snapshots(progress):
     _chroot(["/usr/lib/fenrir/fenrir-setup-snapshots", "--no-initramfs"], progress)
 
 
-def finalize_bootloader(progress):
+LIMINE_BOOT_PATH = re.compile(r"^\$?boot\(\):(/[^#]+)(#[0-9a-fA-F]+)?$")
+
+
+def _limine_boot_problems(conf_text, esp):
+    """Why limine.conf can't boot this install, as a list; empty when it can."""
+    entries, entry = [], None
+    for raw in conf_text.splitlines():
+        line = raw.strip()
+        if line.startswith("/"):
+            entry = {"title": line.lstrip("/+").strip(), "protocol": "", "kernel": [], "modules": []}
+            entries.append(entry)
+        elif entry is not None and ":" in line and not line.startswith("#"):
+            key, value = (part.strip() for part in line.split(":", 1))
+            key = key.lower()
+            if key == "protocol":
+                entry["protocol"] = value.lower()
+            elif key in ("path", "kernel_path"):
+                entry["kernel"].append(value)
+            elif key == "module_path":
+                entry["modules"].append(value)
+
+    kernels = [e for e in entries if e["protocol"] == "linux"]
+    if not kernels:
+        return ["it has no kernel entries"]
+    problems = []
+    for e in kernels:
+        if not e["kernel"] or not e["modules"]:
+            problems.append(f"'{e['title']}' lacks a kernel or initramfs")
+        for value in e["kernel"] + e["modules"]:
+            match = LIMINE_BOOT_PATH.match(value)
+            if not match:
+                problems.append(f"'{e['title']}' points off the boot partition: {value}")
+            elif not (esp / match.group(1).lstrip("/")).is_file():
+                problems.append(f"'{e['title']}' needs {match.group(1)}, which is missing")
+    return problems
+
+
+def verify_boot_entries(progress):
+    # limine-mkinitcpio skips a kernel whose initramfs fails to build and still exits 0.
+    progress("Checking the boot entries")
+    problems = _limine_boot_problems((TARGET / "boot/limine.conf").read_text(), TARGET / "boot")
+    if problems:
+        raise InstallError("The new system can't boot: limine.conf " + "; ".join(problems))
+
+
+def finalize_bootloader(disk, uefi, progress):
     progress("Installing Limine")
     _chroot(["limine-install"], progress)
     # limine-update writes the real per-kernel entries, so it must run last or
     # limine-install clobbers them back to a placeholder.
     progress("Generating initramfs and Limine boot entries")
     _chroot(["limine-update"], progress)
+    verify_boot_entries(progress)
+
+    if not uefi:
+        # Stage 2 finds limine-bios.sys and limine.conf at the ESP root.
+        progress("Installing Limine's BIOS boot code")
+        shutil.copyfile(TARGET / "usr/share/limine/limine-bios.sys", TARGET / "boot/limine-bios.sys")
+        _chroot(["limine", "bios-install", disk, str(BIOS_PART_NUM)], progress)
 
     progress("Configuring Limine to boot straight to the desktop")
     limine_conf = TARGET / "boot/limine.conf"
@@ -577,7 +720,11 @@ def finalize_bootloader(progress):
     limine_conf.write_text("\n".join(lines) + "\n")
 
 
-ENABLED_SERVICES = ("NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "sddm", "firewalld")
+# NetworkManager stays first: ProgressPage's last step triggers on "Enabling NetworkManager".
+ENABLED_SERVICES = (
+    "NetworkManager", "systemd-timesyncd", "bluetooth", "fstrim.timer", "sddm", "firewalld",
+    "systemd-resolved",
+)
 
 
 def enable_services(progress):
@@ -588,6 +735,7 @@ def enable_services(progress):
 # firewalld's stock public zone minus ssh (sshd only runs on the live ISO), plus
 # the desktop discovery services that would otherwise fail silently.
 DEFAULT_ZONE_SERVICES = ("dhcpv6-client", "mdns", "ssdp", "kdeconnect", "steam-streaming")
+FIREWALLD_CONF = "etc/firewalld/firewalld.conf"
 
 
 def configure_firewall(progress):
@@ -595,9 +743,7 @@ def configure_firewall(progress):
     # works in the chroot where firewall-cmd would not.
     progress("Enabling firewall")
 
-    conf = TARGET / "etc/firewalld/firewalld.conf"
-    if not conf.exists():
-        raise InstallError(f"{conf} is missing — is firewalld installed?")
+    conf = TARGET / FIREWALLD_CONF
     lines = conf.read_text().splitlines()
     for i, line in enumerate(lines):
         if line.startswith("DefaultZone="):
@@ -635,13 +781,42 @@ def unmount_target(progress):
         _stream(["umount", "-Rl", str(TARGET)], progress)
 
 
+def check_preconditions(disk, progress):
+    """Everything that can fail before the disk is touched. Returns (uefi, x86_64_v3)."""
+    progress("Checking the live system")
+    if disk not in {d["path"] for d in list_disks()}:
+        raise InstallError(f"{disk} is not a disk this installer can install to")
+    if not LIVE_ROOTFS.is_dir():
+        raise InstallError(
+            f"{LIVE_ROOTFS} is missing - the installer must run from a booted "
+            "Fenrir live image, which is what it copies onto the disk."
+        )
+    for f in (LIVE_FENRIR_MIRRORLIST, LIVE_FENRIR_KEY, LIVE_ROOTFS / FIREWALLD_CONF):
+        if not f.exists():
+            raise InstallError(f"{f} is missing from the live image")
+    if not any((LIVE_ROOTFS / BOOTLOADER_STAGE).glob("*.pkg.tar.zst")):
+        raise InstallError(f"No bootloader packages staged in /{BOOTLOADER_STAGE}")
+
+    uefi = Path("/sys/firmware/efi").is_dir()
+    progress(f"Firmware: {'UEFI' if uefi else 'BIOS (legacy boot)'}")
+
+    ld_help = subprocess.run([LD_SO, "--help"], capture_output=True, text=True).stdout
+    x86_64_v3 = _supports_x86_64_v3(ld_help)
+    progress(f"CPU runs x86-64-v3 packages: {'yes' if x86_64_v3 else 'no'}")
+    if x86_64_v3 and not (LIVE_ROOTFS / V3_MIRRORLIST).exists():
+        raise InstallError(f"/{V3_MIRRORLIST} is missing from the live image")
+    return uefi, x86_64_v3
+
+
 def run_install(plan: InstallPlan, progress):
-    partition_and_mount(plan.disk, plan.esp_mib, progress)
+    uefi, x86_64_v3 = check_preconditions(plan.disk, progress)
+    partition_and_mount(plan.disk, plan.esp_mib, uefi, progress)
     progress("Installing packages (this takes a while)")
     clone_live_rootfs(progress)
     remove_live_only_packages(progress)
     initialize_keyring(progress)
     configure_fenrir_repo(progress)
+    configure_v3_repos(x86_64_v3, progress)
     _, root_part = _partition_paths(plan.disk)
     genfstab_target(progress)
     configure_swap(root_part, progress)
@@ -653,10 +828,11 @@ def run_install(plan: InstallPlan, progress):
     configure_sudo(progress)
     configure_polkit(progress)
     configure_plymouth(progress)
+    configure_resume(progress)
     configure_kernel_cmdline(root_part, progress)
     install_bootloader_packages(progress)
     configure_snapshots(progress)
-    finalize_bootloader(progress)
+    finalize_bootloader(plan.disk, uefi, progress)
     enable_services(progress)
     configure_firewall(progress)
     unmount_target(progress)

@@ -17,8 +17,12 @@ depends=(
   'python'
   'arch-install-scripts'
   'gptfdisk'
+  'parted'
   'dosfstools'
   'btrfs-progs'
+  'rsync'
+  'psmisc'
+  'util-linux'
   'polkit'
 )
 source=()
