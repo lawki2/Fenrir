@@ -1,7 +1,9 @@
 #!/bin/sh
 # Root side of Settings > Updates and the welcome window's extras; only knows the jobs below.
-# Jobs run in their own session, logged to /run/fenrir-pkg, so a shell reload can't kill pacman.
+# Jobs run as the fenrir-pkg system unit, logged to /run/fenrir-pkg, so a shell reload or logout can't kill pacman.
 set -eu
+# pkexec keeps the caller's umask, and the shell has to read the files below.
+umask 022
 
 # bundle: the packages it installs, or "chwd" for hardware detection
 bundles() {
@@ -15,6 +17,7 @@ graphics chwd
 EOF
 }
 
+# Always a full -Syu: installs ship without sync databases, and a bare -S would be a partial upgrade.
 case "${1:-}" in
     list)
         bundles
@@ -29,9 +32,9 @@ case "${1:-}" in
         [ -n "$pkgs" ] || { echo "Unknown extra: ${2:-}" >&2; exit 2; }
         job="install ${2}"
         if [ "$pkgs" = " chwd" ]; then
-            cmd="chwd -a"
+            cmd="pacman -Syu --noconfirm --noprogressbar && chwd -a"
         else
-            cmd="pacman -S --needed --noconfirm --noprogressbar$pkgs"
+            cmd="pacman -Syu --needed --noconfirm --noprogressbar$pkgs"
         fi
         ;;
     *)
@@ -44,8 +47,9 @@ dir=/run/fenrir-pkg
 mkdir -p "$dir"
 chmod 755 "$dir"
 
-# /run is cleared on boot; a stale "running" only survives if the job itself died.
-if [ "$(cat "$dir/state" 2>/dev/null)" = running ] && [ -d "/proc/$(cat "$dir/pid" 2>/dev/null)" ]; then
+# Held until the unit is up, so two starts can't both pass the check and clobber each other's files.
+exec 9> "$dir/lock"
+if ! flock -n 9 || systemctl is-active --quiet fenrir-pkg.service; then
     echo "Another install is already running" >&2
     exit 1
 fi
@@ -54,6 +58,8 @@ echo "$job" > "$dir/job"
 echo running > "$dir/state"
 : > "$dir/log"
 # Done only once pacman exits, after fenrir-update-guard's hook has synced the files to disk.
-setsid -f sh -c 'echo $$ > /run/fenrir-pkg/pid
-    '"$cmd"' > /run/fenrir-pkg/log 2>&1
-    echo $? > /run/fenrir-pkg/state'
+if ! systemd-run --unit=fenrir-pkg --collect --quiet -p ManagedOOMPreference=omit \
+    sh -c "{ $cmd; } > $dir/log 2>&1; echo \$? > $dir/state"; then
+    echo 1 > "$dir/state"
+    exit 1
+fi

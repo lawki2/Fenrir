@@ -72,19 +72,60 @@ quiet_limine() {
     grep -q '^[[:space:]]*quiet:' "$conf" || sed -i '1i quiet: yes' "$conf"
 }
 
+setup_snapshots() {
+    # Not in a chroot or container: that's the ISO or a package build, and the installer runs it itself.
+    systemd-detect-virt --chroot -q || systemd-detect-virt --container -q \
+        || /usr/lib/fenrir/fenrir-setup-snapshots || echo "fenrir-settings: snapshot setup failed; updates still work, without rollback"
+}
+
+# Keeps firmware update info current for Settings > Updates.
+enable_fwupd_refresh() {
+    systemctl enable --now fwupd-refresh.timer 2>/dev/null || true
+}
+
+# Closes the app hogging memory before the whole system stalls; see the oomd drop-ins.
+enable_oomd() {
+    systemctl enable --now systemd-oomd.service 2>/dev/null || true
+}
+
+# ydotoold for the alternate paste bind; 70-fenrir-uinput.rules gives it /dev/uinput.
+enable_ydotool() {
+    systemctl --global enable ydotool.service 2>/dev/null || true
+}
+
 post_install() {
     repair_live_leftovers
     quiet_limine
-    # Not in a chroot: that's the ISO build, and the installer runs it itself.
-    systemd-detect-virt --chroot -q || /usr/lib/fenrir/fenrir-setup-snapshots || echo "fenrir-settings: snapshot setup failed; updates still work, without rollback"
-    # Keeps firmware update info current for Settings > Updates.
-    systemctl enable --now fwupd-refresh.timer 2>/dev/null || true
-    # Closes the app hogging memory before the whole system stalls; see the oomd drop-ins.
-    systemctl enable --now systemd-oomd.service 2>/dev/null || true
+    setup_snapshots
+    enable_fwupd_refresh
+    enable_oomd
+    enable_ydotool
     setup_printing
     migrate_homes
 }
 
+# $1 is older than $2
+older() {
+    [ "$(vercmp "$1" "$2")" -lt 0 ]
+}
+
+# Only the steps added since the old version ($2), so services a user turned off stay off.
 post_upgrade() {
-    post_install
+    if older "$2" 2026.09.24.1359; then
+        enable_fwupd_refresh
+        setup_printing
+        migrate_homes
+    fi
+    # Installs from ISOs before the installer skipped live-only files, or ran the snapshot setup.
+    if older "$2" 2026.09.24.1814; then
+        repair_live_leftovers
+        setup_snapshots
+    fi
+    if older "$2" 2026.09.24.2228; then
+        enable_oomd
+    fi
+    if older "$2" 2026.09.25.1544; then
+        quiet_limine
+        enable_ydotool
+    fi
 }

@@ -12,8 +12,8 @@ depends=(
   'udisks2' 'gvfs' 'gvfs-mtp' 'gvfs-smb'
   'cups' 'ipp-usb' 'avahi' 'nss-mdns'
   'pacman-contrib' 'fakeroot' 'fwupd'
-  'app2unit'
-  'fenrir-welcome'
+  'app2unit' 'ydotool' 'pavucontrol' 'sweet-cursors-git'
+  'fenrir-welcome' 'fenrir-keyring'
   'snapper' 'snap-pac' 'limine-snapper-sync'
 )
 install=fenrir-settings.install
@@ -34,14 +34,18 @@ package() {
   install -Dm755 "$startdir/bin/fenrir-branding" "$pkgdir/usr/lib/fenrir/fenrir-branding"
   install -Dm755 "$startdir/bin/fenrir-update-guard" "$pkgdir/usr/lib/fenrir/fenrir-update-guard"
   install -Dm755 "$startdir/bin/fenrir-setup-snapshots" "$pkgdir/usr/lib/fenrir/fenrir-setup-snapshots"
+  install -Dm755 "$startdir/bin/fenrir-limine-bios" "$pkgdir/usr/lib/fenrir/fenrir-limine-bios"
   for hook in 00-fenrir-guard 00-fenrir-shell-pause 00-fenrir-hypr-pause zzz-fenrir-guard zzz-fenrir-hypr-resume zzz-fenrir-shell-resume; do
     install -Dm644 "$startdir/system/$hook.hook" "$pkgdir/usr/share/libalpm/hooks/$hook.hook"
   done
   install -Dm644 "$startdir/system/zz-fenrir-branding.hook" "$pkgdir/usr/share/libalpm/hooks/zz-fenrir-branding.hook"
+  install -Dm644 "$startdir/system/80-fenrir-limine-bios.hook" "$pkgdir/usr/share/libalpm/hooks/80-fenrir-limine-bios.hook"
   install -Dm644 "$startdir/system/os-release" "$share/os-release"
   install -Dm644 "$startdir/system/org.fenrir.pkg.policy" "$pkgdir/usr/share/polkit-1/actions/org.fenrir.pkg.policy"
   install -Dm644 "$startdir/system/oomd.conf" "$pkgdir/usr/lib/systemd/oomd.conf.d/10-fenrir.conf"
   install -Dm644 "$startdir/system/oomd-root-slice.conf" "$pkgdir/usr/lib/systemd/system/-.slice.d/10-fenrir-oomd.conf"
   install -Dm644 "$startdir/system/oomd-user-service.conf" "$pkgdir/usr/lib/systemd/system/user@.service.d/10-fenrir-oomd.conf"
   install -Dm644 "$startdir/system/oomd-session.conf" "$pkgdir/usr/lib/systemd/user/wayland-wm@.service.d/10-fenrir-oomd.conf"
+  install -Dm644 "$startdir/system/session-oomd.conf" "$pkgdir/usr/lib/systemd/system/session-.scope.d/10-fenrir-oomd.conf"
+  install -Dm644 "$startdir/system/70-fenrir-uinput.rules" "$pkgdir/usr/lib/udev/rules.d/70-fenrir-uinput.rules"
 }

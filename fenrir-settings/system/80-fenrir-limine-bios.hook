@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = limine
+
+[Action]
+Description = Updating Limine's BIOS boot code...
+When = PostTransaction
+Exec = /usr/lib/fenrir/fenrir-limine-bios

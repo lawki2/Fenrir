@@ -1,0 +1,23 @@
+# Maintainer: Fenrir
+pkgname=fenrir-keyring
+# build-local-repo.sh stamps the build time here, so every rebuild is an update.
+pkgver=0
+pkgrel=1
+pkgdesc="Fenrir repository signing key, for pacman-key --populate"
+arch=('any')
+license=('GPL-3.0-only')
+makedepends=('gnupg')
+install=fenrir-keyring.install
+source=()
+
+# build-local-repo.sh copies the key in from archiso/airootfs/etc/pacman.d, its single source.
+build() {
+  gpg --dearmor < "$startdir/fenrir-signing-key.asc" > fenrir.gpg
+}
+
+package() {
+  local keyrings="$pkgdir/usr/share/pacman/keyrings"
+  install -Dm644 fenrir.gpg "$keyrings/fenrir.gpg"
+  install -Dm644 "$startdir/fenrir-trusted" "$keyrings/fenrir-trusted"
+  install -Dm644 /dev/null "$keyrings/fenrir-revoked"
+}

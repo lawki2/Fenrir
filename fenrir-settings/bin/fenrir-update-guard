@@ -38,6 +38,11 @@ tell_hyprland() {
     done
 }
 
+# pacstrap bind-mounts the host's /run, so in a chroot these would reach the builder's own desktop.
+case "${1:-}" in
+    start | pause | resume | hypr-pause | hypr-resume) systemd-detect-virt --chroot -q && exit 0 ;;
+esac
+
 case "${1:-}" in
     start)
         # Held for as long as pacman runs, so it also ends if pacman dies before "finish".

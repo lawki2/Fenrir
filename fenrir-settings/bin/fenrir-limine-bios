@@ -1,0 +1,24 @@
+#!/bin/sh
+# Run by 80-fenrir-limine-bios.hook: BIOS boot breaks unless the disk's stage 2 matches /boot/limine-bios.sys.
+set -u
+
+[ -f /boot/limine-bios.sys ] || exit 0
+# The installer sets up BIOS boot itself.
+systemd-detect-virt --chroot -q && exit 0
+
+fail() {
+    echo "fenrir: Limine's BIOS boot code was NOT updated ($1), so this computer may not start."
+    echo "fenrir: run 'limine bios-install <disk> <partition>' as root, then copy /usr/share/limine/limine-bios.sys to /boot/, before rebooting."
+    exit 1
+}
+
+src=$(findmnt -nvo SOURCE -T /boot) || fail "can't find the partition holding /boot"
+disk=$(lsblk -no PKNAME "$src" | head -n1)
+[ -n "$disk" ] || fail "can't find the disk holding $src"
+disk=/dev/$disk
+part=$(lsblk -nro PARTN,PARTTYPE "$disk" | awk 'tolower($2) == "21686148-6449-6e6f-744e-656564454649" { print $1; exit }')
+[ -n "$part" ] || fail "no BIOS boot partition on $disk"
+
+limine bios-install "$disk" "$part" || fail "limine bios-install $disk $part failed"
+cp /usr/share/limine/limine-bios.sys /boot/limine-bios.sys || fail "couldn't copy limine-bios.sys to /boot"
+echo "Limine's BIOS boot code updated on $disk"

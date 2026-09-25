@@ -1,0 +1,2 @@
+# The active seat's user gets /dev/uinput for ydotool, without joining the input group; sorts before 73-seat-late.rules.
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"
