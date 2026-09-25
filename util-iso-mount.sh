@@ -9,15 +9,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-umount_img() {
-    if [[ -n ${IMG_ACTIVE_MOUNTS[@]} ]]; then
-        info "umount: [%s]" "${IMG_ACTIVE_MOUNTS[@]}"
-        sudo umount "${IMG_ACTIVE_MOUNTS[@]}"
-        unset IMG_ACTIVE_MOUNTS
-        rm -r "$1"
-    fi
-}
-
 check_umount() {
     if mountpoint -q "$1"; then
         sudo umount "$1"

@@ -9,44 +9,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-error_function() {
-    if [[ -p $logpipe ]]; then
-        rm "$logpipe"
-    fi
-    # first exit all subshells, then print the error
-    if (( ! BASH_SUBSHELL )); then
-        error "A failure occurred in %s()." "$1"
-        plain "Aborting..."
-    fi
-    umount_fs
-    umount_img
-    exit 2
-}
-
-run_safe() {
-    local restoretrap func="$1"
-    set -e
-    set -E
-    restoretrap=$(trap -p ERR)
-    trap 'error_function $func' ERR
-
-    if ${verbose}; then
-        run_log "$func"
-    else
-        "$func"
-    fi
-
-    eval $restoretrap
-    set +E
-    set +e
-}
-
-check_umount() {
-    if mountpoint -q "$1"; then
-        umount -l "$1"
-    fi
-}
-
 trap_exit() {
     local sig=$1; shift
     error "$@"
@@ -148,16 +110,14 @@ prepare_profile(){
         stage=${src_dir}/archiso/airootfs/opt/fenrir-bootloader
         rm -rf ${stage}
         mkdir -p ${stage}
-        for url in $(pacman -Sp --print-format '%l' limine limine-mkinitcpio-hook); do
+        # The ISO's generic repos, not this host's, which may prefer x86_64_v3 builds.
+        for url in $(pacman --config ${src_dir}/archiso/pacman.conf -Sp --print-format '%l' limine limine-mkinitcpio-hook); do
             case "$url" in
                 file://*) cp "${url#file://}" "${stage}/" ;;
                 *) curl -fL --retry 3 -o "${stage}/$(basename "$url")" "$url" ;;
             esac
         done
 
-        # Clears a stale copy from older builds: the packages are already
-        # unpacked in the squashfs, so shipping them again only cost ~130MB.
-        rm -rf ${src_dir}/archiso/airootfs/opt/fenrir-local-repo
     else
         die "Unknown profile: [%s]" "${profile}"
     fi

@@ -202,6 +202,10 @@ shelly
 # Fenrir's Hyprland/shell defaults, printing and updates; see fenrir-settings/.
 fenrir-settings
 fenrir-welcome
+# Trusts the [fenrir] repo's signing key; see fenrir-keyring/.
+fenrir-keyring
+# The editor fenrir-settings' default binds open.
+vscodium
 
 # Security. Enabled by default at install time, see backend.py's
 # configure_firewall(). firewalld over ufw for its D-Bus + polkit API,
@@ -227,5 +231,7 @@ caelestia-meta
 python-materialyoucolor
 libcava
 ttf-rubik-vf
+# The cursor theme fenrir-settings' variables.lua names.
+sweet-cursors-git
 fenrir-installer
 zen-browser-bin

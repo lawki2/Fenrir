@@ -71,17 +71,13 @@ import ${src_dir}/util-iso-mount.sh
 
 check_requirements
 
-# Refuse to assemble an ISO from a package older than its source tree.
-for pkg_dir in fenrir-installer fenrir-splash fenrir-settings fenrir-welcome; do
-    built="$(find "${src_dir}/local-repo" -maxdepth 1 -name "${pkg_dir}-*.pkg.tar.zst" \
-        -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
-    if [[ -z "$built" ]]; then
-        die "No %s package in local-repo/ - run build-local-repo.sh first." "$pkg_dir"
-    fi
-    if [[ -n "$(find "${src_dir}/${pkg_dir}" -type f -newer "$built" 2>/dev/null)" ]]; then
-        die "%s/ is newer than %s - run build-local-repo.sh first." "$pkg_dir" "$(basename "$built")"
-    fi
+# Refuse to assemble an ISO from a package that wasn't built from its current inputs.
+import ${src_dir}/tools/fenrir-packages.sh
+fresh_repo_dbs || die "Couldn't sync the repo databases to check the packages against."
+for pkg in "${fenrir_build_order[@]}"; do
+    reason="$(pkg_check_current "$pkg")" || die "%s - run build-local-repo.sh first." "${reason:-$pkg could not be checked}"
 done
+rm -rf "$fenrir_fresh_dbpath"
 
 for sig in TERM HUP QUIT; do
     trap "trap_exit $sig \"$(gettext "%s signal caught. Exiting...")\" \"$sig\"" "$sig"
