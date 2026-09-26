@@ -99,6 +99,8 @@ splice_caelestia_shell() {
         echo "==> $file still names quickshell-git - update the quickshell splice." >&2
         return 1
     fi
+    # Shown as the shell's distributor by `caelestia --version`.
+    splice_sed "$file" '-DDISTRIBUTOR="Fenrir"' 's/-DDISTRIBUTOR="[^"]*"/-DDISTRIBUTOR="Fenrir"/' || return 1
     # Pulls fenrir-settings into existing installs, which only -Syu what they already have.
     splice_sed "$file" "    'fenrir-settings'" "s/^depends=($/depends=(\n    'fenrir-settings'/" || return 1
     # Wallpapers.qml falls back to this packaged path; pacstrap would clobber an airootfs copy.

@@ -39,7 +39,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         base_root, theirs_root = fetch(old, Path(tmp)), fetch(new, Path(tmp))
         fenrir_only = 0
-        for ours in sorted(OVERLAY.rglob("*.qml")):
+        for ours in sorted(f for f in OVERLAY.rglob("*") if f.is_file()):
             rel = ours.relative_to(OVERLAY)
             base, theirs = base_root / rel, theirs_root / rel
             if not base.exists():
@@ -55,13 +55,17 @@ def main():
                 print(f"unchanged  {rel}")
                 continue
 
-            # Exit status is the conflict count; negative means merge-file itself failed.
+            if b"\0" in ours.read_bytes() + base.read_bytes() + theirs.read_bytes():
+                print(f"BINARY     {rel}  (changed upstream; decide by hand)")
+                continue
+
+            # Exit status is the conflict count, capped at 127; above that merge-file itself failed.
             merged = subprocess.run(
                 ["git", "merge-file", "-p", "-L", "fenrir", "-L", f"v{old}", "-L", f"v{new}",
                  str(ours), str(base), str(theirs)],
                 capture_output=True, text=True,
             )
-            if merged.returncode < 0:
+            if merged.returncode < 0 or merged.returncode > 127:
                 sys.exit(f"git merge-file failed on {rel}: {merged.stderr}")
             status = "merged" if merged.returncode == 0 else f"CONFLICT ({merged.returncode})"
             print(f"{status:<10} {rel}")
