@@ -167,8 +167,7 @@ a change in.
 
 Fenrir is built on [CachyOS](https://cachyos.org/) and its
 [live ISO](https://github.com/CachyOS/CachyOS-Live-ISO), and bundles
-[Caelestia](https://github.com/caelestia-dots)'s shell and dotfiles. Default
-wallpaper by Maria Lupan on [Unsplash](https://unsplash.com/photos/0IFvTeguMJs).
+[Caelestia](https://github.com/caelestia-dots)'s shell and dotfiles.
 See [THIRD_PARTY.md](THIRD_PARTY.md) for the licenses of bundled components.
 Fenrir's own code is licensed under [GPL-3.0](LICENSE).
 
