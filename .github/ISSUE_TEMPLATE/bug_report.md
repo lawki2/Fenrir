@@ -5,7 +5,9 @@ title: ""
 labels: bug
 ---
 
-**ISO version** (welcome screen, or the download filename, e.g. `fenrir-linux-260826.iso`):
+**ISO version** (the download filename, e.g. `fenrir-linux-260926.iso`):
+
+**If installed:** output of `pacman -Q fenrir-settings fenrir-splash caelestia-shell`
 
 **Where this happened** (live session / after install):
 
