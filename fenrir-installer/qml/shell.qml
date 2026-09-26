@@ -187,6 +187,21 @@ FloatingWindow {
         }
     }
 
+    // A closed window leaves the install running unseen, so refuse until it ends; otherwise
+    // quit, since Quickshell keeps running without windows.
+    Connections {
+        target: pageLoader.Window.window
+
+        function onClosing(close): void {
+            if (root.currentPage === "progress" && pageLoader.item?.running) {
+                close.accepted = false;
+                pageLoader.item.warnClose();
+            } else {
+                Qt.quit();
+            }
+        }
+    }
+
     Rectangle {
         id: pickerOverlay
         anchors.fill: parent

@@ -3,6 +3,7 @@ Runs as root already (launched via pkexec) — no escalation happens here.
 """
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -130,13 +131,31 @@ def _partition_paths(disk):
 BIOS_PART_NUM = 3
 
 
+def _is_mountpoint(path):
+    with open("/proc/self/mountinfo") as mountinfo:
+        return any(line.split()[4] == str(path) for line in mountinfo)
+
+
+def _release_target(progress):
+    """Unmounts TARGET and everything under it, killing whatever still holds it open."""
+    # Never without a mount: fuser -m on a plain directory matches the live root, installer and all.
+    if not _is_mountpoint(TARGET) or os.stat(TARGET).st_dev == os.stat("/").st_dev:
+        return
+    # gpg-agent from pacman-key can outlive its chroot and keep the target busy.
+    subprocess.run(
+        ["fuser", "-km", str(TARGET)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    time.sleep(1)
+    if subprocess.run(["umount", "-R", str(TARGET)]).returncode != 0:
+        progress("Target still busy, forcing a lazy unmount")
+        _stream(["umount", "-Rl", str(TARGET)], progress)
+
+
 def partition_and_mount(disk, esp_mib, uefi, progress):
     boot_part, root_part = _partition_paths(disk)
 
     progress("Clearing any leftover mounts from a previous attempt")
-    subprocess.run(
-        ["umount", "-R", str(TARGET)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
+    _release_target(progress)
 
     progress(f"Wiping {disk}")
     _stream(["wipefs", "-a", disk], progress)
@@ -512,6 +531,48 @@ def create_user(username, full_name, password, progress):
             raise InstallError(f"Failed to set password for {account}")
 
 
+# fd 3 carries the password: a background job's own stdin is /dev/null. Waits up to 10 s.
+KEYRING_SCRIPT = """
+d=$(mktemp -d)
+exec 3<&0
+gnome-keyring-daemon --unlock --foreground --components= --control-directory="$d" <&3 >/dev/null 2>&1 &
+pid=$!
+exec 3<&-
+i=0
+while [ ! -e "$XDG_DATA_HOME/keyrings/login.keyring" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+kill "$pid" 2>/dev/null
+wait "$pid" 2>/dev/null
+rm -rf "$d"
+[ -e "$XDG_DATA_HOME/keyrings/login.keyring" ]
+"""
+KEYRING_TIMEOUT = 60
+
+
+def create_login_keyring(username, password, progress):
+    # gnome-keyring only registers collections at startup, so one first created at the
+    # first unlock stays invisible to apps until the next login.
+    progress("Creating the login keyring")
+    home = f"/home/{username}"
+    keyring = TARGET / home.lstrip("/") / ".local/share/keyrings/login.keyring"
+    note = "Note: the login keyring could not be created; apps create it after the first login"
+    if not (TARGET / "usr/bin/gnome-keyring-daemon").exists():
+        progress(note)
+        return
+    cmd = [
+        "arch-chroot", str(TARGET), "runuser", "-u", username, "--",
+        "env", "-i", f"HOME={home}", f"XDG_DATA_HOME={home}/.local/share", "PATH=/usr/bin",
+        "sh", "-c", KEYRING_SCRIPT,
+    ]
+    try:
+        # Password on stdin with no newline: the daemon reads to EOF and keeps every byte.
+        status = subprocess.run(cmd, input=password, text=True, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, timeout=KEYRING_TIMEOUT).returncode
+    except subprocess.TimeoutExpired:
+        status = "timeout"  # a daemon still holding the target is killed by unmount_target
+    if not keyring.exists():
+        progress(f"{note} ({status})")
+
+
 def configure_sudo(progress):
     # Arch's sudoers has wheel commented out; sudo requires exactly 0440.
     progress("Enabling sudo for the wheel group")
@@ -770,18 +831,32 @@ def configure_firewall(progress):
 
 def unmount_target(progress):
     progress("Unmounting target")
-    # gpg-agent from pacman-key can outlive its chroot and keep the target busy.
-    subprocess.run(
-        ["fuser", "-km", str(TARGET)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
-    time.sleep(1)
-    result = subprocess.run(["umount", "-R", str(TARGET)])
-    if result.returncode != 0:
-        progress("Target still busy, forcing a lazy unmount")
-        _stream(["umount", "-Rl", str(TARGET)], progress)
+    _release_target(progress)
 
 
-def check_preconditions(disk, progress):
+USERNAME = re.compile(r"^[a-z_][a-z0-9_-]*$")
+USERNAME_MAX = 32  # useradd's limit
+
+
+def _account_names(root):
+    """Every user and group name in root's passwd and group files."""
+    names = set()
+    for rel in ("etc/passwd", "etc/group"):
+        names |= {l.split(":", 1)[0] for l in (root / rel).read_text().splitlines() if ":" in l}
+    return names
+
+
+def _username_problem(username, taken):
+    if not USERNAME.match(username):
+        return "must be lowercase letters, digits, - or _, starting with a letter or _"
+    if len(username) > USERNAME_MAX:
+        return f"is longer than {USERNAME_MAX} characters"
+    if username in taken:
+        return "is already a user or group on the system being installed"
+    return None
+
+
+def check_preconditions(disk, username, progress):
     """Everything that can fail before the disk is touched. Returns (uefi, x86_64_v3)."""
     progress("Checking the live system")
     if disk not in {d["path"] for d in list_disks()}:
@@ -791,6 +866,11 @@ def check_preconditions(disk, progress):
             f"{LIVE_ROOTFS} is missing - the installer must run from a booted "
             "Fenrir live image, which is what it copies onto the disk."
         )
+    # useradd runs long after the wipe, so a name it would refuse must be caught here.
+    # liveuser is deleted from the clone before the new account is made.
+    problem = _username_problem(username, _account_names(LIVE_ROOTFS) - {"liveuser"})
+    if problem:
+        raise InstallError(f"The username {username!r} {problem}")
     for f in (LIVE_FENRIR_MIRRORLIST, LIVE_FENRIR_KEY, LIVE_ROOTFS / FIREWALLD_CONF):
         if not f.exists():
             raise InstallError(f"{f} is missing from the live image")
@@ -809,7 +889,19 @@ def check_preconditions(disk, progress):
 
 
 def run_install(plan: InstallPlan, progress):
-    uefi, x86_64_v3 = check_preconditions(plan.disk, progress)
+    uefi, x86_64_v3 = check_preconditions(plan.disk, plan.username, progress)
+    try:
+        _install(plan, uefi, x86_64_v3, progress)
+    except BaseException:
+        # Left mounted, the target makes a retry in this session fail at wipefs.
+        try:
+            _release_target(progress)
+        except Exception as exc:
+            progress(f"Note: could not unmount {TARGET}: {exc}")
+        raise
+
+
+def _install(plan, uefi, x86_64_v3, progress):
     partition_and_mount(plan.disk, plan.esp_mib, uefi, progress)
     progress("Installing packages (this takes a while)")
     clone_live_rootfs(progress)
@@ -825,6 +917,7 @@ def run_install(plan: InstallPlan, progress):
     configure_autologin(plan.username, progress)
     configure_hostname(plan.hostname, progress)
     create_user(plan.username, plan.full_name, plan.password, progress)
+    create_login_keyring(plan.username, plan.password, progress)
     configure_sudo(progress)
     configure_polkit(progress)
     configure_plymouth(progress)

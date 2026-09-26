@@ -25,14 +25,13 @@ InstallerPage {
 
     property var disks: []
     property string selectedDisk: ""
-    property bool errorVisible: false
 
     readonly property var selectedDisk_: root.disks.find(d => d.path === root.selectedDisk) ?? null
     readonly property bool diskTooSmall: root.selectedDisk_ !== null && root.selectedDisk_.size / (1024 ** 3) < root.minRecommendedGib
     readonly property bool confirmed: root.selectedDisk !== "" && !root.diskTooSmall && confirmRow.value === root.confirmText
 
     function showError(): void {
-        root.errorVisible = true;
+        confirmRow.field.isError = true;
     }
 
     function sizeLabel(disk): string {
@@ -159,7 +158,7 @@ InstallerPage {
             label: qsTr("Type %1 to continue").arg(root.confirmText)
             subtext: root.selectedDisk !== "" ? qsTr("Everything on %1 will be lost").arg(root.selectedDisk) : qsTr("Select a disk first")
             placeholderText: root.confirmText
-            errorText: root.errorVisible && !root.confirmed ? qsTr("Select a disk and type %1 exactly").arg(root.confirmText) : ""
+            errorText: qsTr("Select a disk and type %1 exactly").arg(root.confirmText)
             onValueEdited: value => confirmRow.value = value
         }
     }
