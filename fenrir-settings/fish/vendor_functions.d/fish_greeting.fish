@@ -1,10 +1,10 @@
 function fish_greeting
     echo -ne '\x1b[38;5;16m'  # Set colour to primary
-    echo '     ______           __          __  _       '
-    echo '    / ____/___ ____  / /__  _____/ /_(_)___ _ '
-    echo '   / /   / __ `/ _ \/ / _ \/ ___/ __/ / __ `/ '
-    echo '  / /___/ /_/ /  __/ /  __(__  ) /_/ / /_/ /  '
-    echo '  \____/\__,_/\___/_/\___/____/\__/_/\__,_/   '
+    echo '      ______                _'
+    echo '     / ____/__  ____  _____(_)____'
+    echo '    / /_  / _ \/ __ \/ ___/ / ___/'
+    echo '   / __/ /  __/ / / / /  / / /'
+    echo '  /_/    \___/_/ /_/_/  /_/_/'
     set_color normal
     fastfetch --key-padding-left 5
 end

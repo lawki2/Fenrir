@@ -21,6 +21,8 @@ Singleton {
     property int lastVerdict: -1
     // Nothing runs until the saved settings are read, so login never starts with the defaults.
     property bool loaded: false
+    readonly property string uid: (Quickshell.env("XDG_RUNTIME_DIR") ?? "").match(/^\/run\/user\/(\d+)$/)?.[1] ?? ""
+    property bool stoppingStale: false
 
     FileView {
         id: file
@@ -79,7 +81,7 @@ Singleton {
 
     function restart(): void {
         proc.running = false;
-        proc.running = props.enabled;
+        proc.running = props.enabled && !root.stoppingStale;
     }
 
     // The schedule settles `enabled` first, so hyprsunset starts at most once. Rewriting the
@@ -95,6 +97,10 @@ Singleton {
             props.endTime = "06:00";
         root.applySchedule();
         root.loaded = true;
+        if (!persist.staleStopped && root.uid) {
+            root.stoppingStale = true;
+            staleStop.running = true;
+        }
         root.restart();
         Qt.callLater(() => file.writeAdapter());
     }
@@ -137,6 +143,27 @@ Singleton {
         id: proc
 
         command: ["hyprsunset", "-t", String(props.temperature)]
+    }
+
+    // A crashed shell leaves its hyprsunset holding the CTM manager, and a second one exits at once.
+    Process {
+        id: staleStop
+
+        command: ["sh", "-c", "pkill -x -U \"$1\" hyprsunset && timeout 3 pidwait -x -U \"$1\" hyprsunset", "sh", root.uid]
+        onExited: {
+            persist.staleStopped = true;
+            root.stoppingStale = false;
+            root.restart();
+        }
+    }
+
+    // A reload already replaces hyprsunset cleanly, so only a fresh shell stops a stale one.
+    PersistentProperties {
+        id: persist
+
+        property bool staleStopped
+
+        reloadableId: "fenrirNightLight"
     }
 
     IpcHandler {

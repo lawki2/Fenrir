@@ -136,8 +136,9 @@ Singleton {
             color: Colours.tPalette.m3surface
             surfaceFormat.opaque: false
 
-            implicitWidth: 820
-            implicitHeight: 760
+            // Nexus's height for this screen, only as wide as the one content column; the pages scroll.
+            implicitWidth: Math.min(Math.round(implicitHeight * contentItem.Tokens.sizes.nexus.ratio), contentItem.Tokens.sizes.nexus.maxContentWidth + contentItem.Tokens.padding.extraLarge * 2)
+            implicitHeight: Math.round(screen.height * contentItem.Tokens.sizes.nexus.heightMult)
             minimumSize.width: contentItem.Tokens.sizes.nexus.minWidth
             minimumSize.height: contentItem.Tokens.sizes.nexus.minHeight
 

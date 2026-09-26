@@ -7,8 +7,8 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 
-// Covers the session starting up and raises the lock before uncovering. Confirms it through
-// the isSecure() call that Fenrir's Lock.qml overlay adds, so a Caelestia bump must keep it.
+// Covers the session starting up, locking it first unless a password login already authenticated it.
+// The lock is confirmed through the isSecure() call Fenrir's Lock.qml overlay adds; a Caelestia bump must keep it.
 ShellRoot {
     id: root
 
@@ -16,7 +16,7 @@ ShellRoot {
     readonly property int settleMs: 400
     readonly property int fadeMs: 700
     readonly property int retryMs: 1000
-    // Past this without a confirmed lock the session ends; it is never uncovered unlocked.
+    // Past this without a confirmed lock, a session that needed one ends; it is never uncovered unlocked.
     readonly property int maxWaitMs: 60000
     readonly property string sessionId: Quickshell.env("XDG_SESSION_ID") || "self"
 
@@ -26,8 +26,12 @@ ShellRoot {
     property bool secure: false
     property bool timedOut: false
     property bool fading: false
-    // sddm's password login already authenticated the user, so only that one may uncover on timeout.
-    property bool passwordLogin: false
+    // logind's PAM service for this session; empty when it couldn't be read.
+    property string service: ""
+    property bool serviceChecked: false
+    // Only a password login through sddm's greeter is already authenticated; anything else locks.
+    readonly property bool authenticated: root.serviceChecked && root.service === "sddm"
+    readonly property bool mustLock: root.serviceChecked && !root.authenticated
 
     function statePath(): string {
         const state = Quickshell.env("XDG_STATE_HOME");
@@ -37,13 +41,13 @@ ShellRoot {
     }
 
     function requestLock(): void {
-        if (!root.secure && !root.timedOut && !lockProc.running)
+        if (root.mustLock && !root.secure && !root.timedOut && !lockProc.running)
             lockProc.running = true;
     }
 
     function giveUp(): void {
         root.timedOut = true;
-        if (root.passwordLogin)
+        if (root.authenticated)
             root.fading = true;
         else
             root.endSession();
@@ -68,22 +72,40 @@ ShellRoot {
         }
     }
 
-    // Fast path only: the retry timer below still locks if this layer never opens.
+    // Fast path only: the retry timers below still act if this layer never opens.
     Connections {
         target: Hyprland
 
         function onRawEvent(event): void {
-            if (event.name === "openlayer" && event.data === root.readyLayer)
+            if (event.name !== "openlayer" || event.data !== root.readyLayer)
+                return;
+            if (root.authenticated)
+                root.shellUp = true;
+            else
                 root.requestLock();
         }
     }
 
+    // Quickshell ends the stdout stream before emitting exited, so the text is complete here.
     Process {
         running: true
         command: ["loginctl", "show-session", root.sessionId, "-p", "Service", "--value"]
         stdout: StdioCollector {
-            onStreamFinished: root.passwordLogin = text.trim() === "sddm"
+            id: serviceOut
         }
+        onExited: code => {
+            if (root.serviceChecked)
+                return;
+            root.service = code === 0 ? serviceOut.text.trim() : "";
+            root.serviceChecked = true;
+        }
+    }
+
+    // A loginctl that never answers (or never starts) leaves the service unknown, which locks.
+    Timer {
+        running: !root.serviceChecked
+        interval: 3000
+        onTriggered: root.serviceChecked = true
     }
 
     // Exit code 0 means a caelestia instance answered, whatever it printed.
@@ -110,8 +132,19 @@ ShellRoot {
         }
     }
 
+    // Any answer means the shell is up; only asked where nothing needs locking.
+    Process {
+        id: upProbe
+
+        command: ["qs", "-c", "caelestia", "ipc", "call", "lock", "isSecure"]
+        onExited: code => {
+            if (code === 0)
+                root.shellUp = true;
+        }
+    }
+
     Timer {
-        running: !root.secure && !root.timedOut
+        running: root.mustLock && !root.secure && !root.timedOut
         interval: root.retryMs
         repeat: true
         triggeredOnStart: true
@@ -119,7 +152,7 @@ ShellRoot {
     }
 
     Timer {
-        running: root.shellUp && !root.secure && !root.timedOut
+        running: root.mustLock && root.shellUp && !root.secure && !root.timedOut
         interval: 250
         repeat: true
         onTriggered: {
@@ -129,7 +162,18 @@ ShellRoot {
     }
 
     Timer {
-        running: root.secure
+        running: root.authenticated && !root.shellUp && !root.timedOut
+        interval: root.retryMs
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            if (!upProbe.running)
+                upProbe.running = true;
+        }
+    }
+
+    Timer {
+        running: root.secure || (root.authenticated && root.shellUp)
         interval: root.settleMs
         onTriggered: root.fading = true
     }
