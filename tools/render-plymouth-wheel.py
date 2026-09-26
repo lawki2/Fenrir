@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-SIZE = 128  # one frame, px
+SIZE = 256  # one frame, px; fenrir.script scales it to ~11% of the screen height
 COLS, ROWS = 10, 8  # 80 frames; the script plays one per refresh (~50/s)
 SS = 4  # supersampling
 COLOUR = (0x75, 0xB0, 0xFF, 255)  # assets/schemes/fenrir/default/dark.txt primary

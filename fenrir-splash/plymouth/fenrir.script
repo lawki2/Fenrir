@@ -3,13 +3,13 @@ Window.SetBackgroundTopColor(0.0, 0.051, 0.165);
 Window.SetBackgroundBottomColor(0.0, 0.051, 0.165);
 
 # wheel.png is a grid of frames from tools/render-plymouth-wheel.py; keep these in step with it.
-wheel.size = 128;
+wheel.size = 256;
 wheel.cols = 10;
 wheel.rows = 8;
 
-# About a tenth of the screen height on large screens, never smaller than drawn.
-wheel.shown = wheel.size;
-if (Window.GetHeight() * 0.11 > wheel.size)
+# About a tenth of the screen height on large screens, never below 128 px.
+wheel.shown = 128;
+if (Window.GetHeight() * 0.11 > wheel.shown)
     wheel.shown = Math.Int(Window.GetHeight() * 0.11);
 
 wheel.sheet = Image("wheel.png");
