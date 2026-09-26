@@ -260,9 +260,6 @@ QtObject {
                         title: qsTr("Advanced")
                     }
                 }
-                Component {
-                    NotificationsPage {}
-                }
             }
         },
 

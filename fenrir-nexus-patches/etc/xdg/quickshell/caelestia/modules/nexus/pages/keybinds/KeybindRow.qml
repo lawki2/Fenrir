@@ -77,6 +77,12 @@ ConnectedRect {
         return "";
     }
 
+    // Hyprland matches Shift+digit on the unshifted key, where Qt reports the shifted symbol
+    // (Swedish Shift+7 is "slash"). xkb keycodes 10-19 are the digit row's 1-9, 0.
+    function digitRowKey(scanCode: int): string {
+        return scanCode >= 10 && scanCode <= 19 ? String((scanCode - 9) % 10) : "";
+    }
+
     function isModifierKey(key: int): bool {
         return key === Qt.Key_Shift || key === Qt.Key_Control || key === Qt.Key_Alt
             || key === Qt.Key_Meta || key === Qt.Key_Super_L || key === Qt.Key_Super_R
@@ -200,7 +206,8 @@ ConnectedRect {
                 if (root.modifiersOnly)
                     return;
 
-                const name = root.keyName(event.key);
+                const digit = event.modifiers & Qt.ShiftModifier ? root.digitRowKey(event.nativeScanCode) : "";
+                const name = digit || root.keyName(event.key);
                 if (name.length === 0)
                     return;
 

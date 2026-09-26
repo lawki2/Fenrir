@@ -73,7 +73,7 @@ PageBase {
         StyledText {
             Layout.bottomMargin: Tokens.spacing.medium
             visible: Updates.lastChecked.getTime() > 0
-            text: qsTr("Last checked %1").arg(Qt.formatTime(Updates.lastChecked, "hh:mm"))
+            text: qsTr("Last checked %1").arg(Qt.formatTime(Updates.lastChecked, GlobalConfig.services.useTwelveHourClock ? "hh:mm a" : "hh:mm"))
             color: Colours.palette.m3outline
             font: Tokens.font.body.small
         }

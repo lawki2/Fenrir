@@ -102,8 +102,9 @@ PageBase {
                 availableModes: m.lastIpcObject?.availableModes ?? [],
                 primary: false
             }));
-        if (list.length && !list.some(m => m.primary))
-            list[0].primary = true;
+        const primary = list.find(m => m.x === 0 && m.y === 0) ?? list[0];
+        if (primary)
+            primary.primary = true;
         root.monitorList = list;
         if (!root.selectedName && list.length)
             root.selectedName = list[0].name;

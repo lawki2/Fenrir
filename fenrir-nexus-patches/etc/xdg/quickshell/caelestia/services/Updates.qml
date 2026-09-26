@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Caelestia
+import Caelestia.Config
 
 // Checks for updates in the background; the update itself runs through PkgJob.
 Singleton {
@@ -53,11 +54,16 @@ Singleton {
     }
 
     function updateInTerminal(): void {
-        Quickshell.execDetached(["foot", "--hold", "sudo", "pacman", "-Syu"]);
+        root.runInTerminal("sudo pacman -Syu");
     }
 
     function updateFirmware(): void {
-        Quickshell.execDetached(["foot", "--hold", "fwupdmgr", "update"]);
+        root.runInTerminal("fwupdmgr update");
+    }
+
+    // The configured terminal, started the way the launcher starts terminal apps; it stays open until Enter.
+    function runInTerminal(script: string): void {
+        Quickshell.execDetached(["app2unit", "--", ...GlobalConfig.general.apps.terminal, `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, "sh", "-c", `${script}; printf '\\n%s ' "$1"; read -r _`, "sh", qsTr("Press Enter to close")]);
     }
 
     Process {

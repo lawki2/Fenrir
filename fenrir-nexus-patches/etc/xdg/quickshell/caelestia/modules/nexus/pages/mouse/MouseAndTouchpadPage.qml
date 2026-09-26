@@ -38,6 +38,14 @@ PageBase {
 
     title: Chassis.isLaptop ? qsTr("Mouse & touchpad") : qsTr("Mouse")
 
+    // Closing the page or Nexus mid-drag still saves the last value.
+    Component.onDestruction: {
+        if (commit.running) {
+            commit.stop();
+            HyprVars.set(root.pending);
+        }
+    }
+
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top

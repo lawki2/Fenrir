@@ -21,6 +21,8 @@ PageBase {
     readonly property string zone: "public"
 
     property bool running: false
+    // Nothing about the service's state is shown until firewall-cmd has answered once.
+    property bool statusKnown: false
     property bool loading: true
     property string loadError: ""
     property string actionError: ""
@@ -143,6 +145,7 @@ PageBase {
             onExited: exitCode => {
                 root.loading = false;
                 root.running = exitCode === 0;
+                root.statusKnown = true;
                 enableToggle.checked = root.running;
                 if (exitCode === 0) {
                     root.parseZoneInfo(infoProc.out);
@@ -199,14 +202,15 @@ PageBase {
 
             first: true
             last: true
-            disabled: toggleProc.running || changeProc.running || reloadProc.running
+            indicator.visible: root.statusKnown
+            disabled: !root.statusKnown || toggleProc.running || changeProc.running || reloadProc.running
             text: qsTr("Enable firewall")
             subtext: qsTr("Blocks unsolicited incoming connections; outgoing traffic is unaffected")
             onToggled: root.setEnabled(checked)
         }
 
         StyledText {
-            visible: !root.running
+            visible: root.statusKnown && !root.running
             Layout.fillWidth: true
             Layout.leftMargin: Tokens.padding.largeIncreased
             Layout.rightMargin: Tokens.padding.largeIncreased
