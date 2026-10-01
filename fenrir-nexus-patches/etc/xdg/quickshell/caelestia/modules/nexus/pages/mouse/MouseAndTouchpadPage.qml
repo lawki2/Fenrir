@@ -152,14 +152,22 @@ PageBase {
                 text: qsTr("Gestures")
             }
 
-            // The scratchpad swipes take whichever count this leaves free.
+            // The launcher swipes take whichever count this leaves free.
             SelectRow {
+                id: swipeRow
+
                 first: true
                 label: qsTr("Swipe with")
-                subtext: qsTr("For workspaces and the launcher")
+                subtext: qsTr("To scroll the row and switch workspaces")
                 menuItems: root.fingerItems
-                active: root.fingerItems[root.swipeFingers - 3] ?? null
                 fallbackText: qsTr("%1 fingers").arg(root.swipeFingers)
+
+                // A pick assigns active directly, which would drop a plain binding and miss a reset.
+                Binding {
+                    target: swipeRow
+                    property: "active"
+                    value: root.fingerItems[root.swipeFingers - 3] ?? null
+                }
                 onSelected: item => {
                     const fingers = root.fingerItems.indexOf(item) + 3;
                     HyprVars.set({
@@ -171,20 +179,20 @@ PageBase {
 
             InfoRow {
                 icon: "swipe"
-                label: qsTr("Switch workspace")
+                label: qsTr("Scroll the row")
                 value: qsTr("%1 fingers left or right").arg(root.swipeFingers)
             }
 
             InfoRow {
-                icon: "swipe_up"
-                label: qsTr("Open or close the launcher")
+                icon: "swipe_vertical"
+                label: qsTr("Switch workspace")
                 value: qsTr("%1 fingers up or down").arg(root.swipeFingers)
             }
 
             InfoRow {
                 last: true
-                icon: "swipe_vertical"
-                label: qsTr("Show or hide the scratchpad")
+                icon: "swipe_up"
+                label: qsTr("Open or close the launcher")
                 value: qsTr("%1 fingers up or down").arg(root.otherFingers)
             }
         }

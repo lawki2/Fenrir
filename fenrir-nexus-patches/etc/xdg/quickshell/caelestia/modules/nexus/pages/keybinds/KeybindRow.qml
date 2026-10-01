@@ -20,6 +20,7 @@ ConnectedRect {
     property bool conflict
     // Workspace prefixes: keybinds.lua adds the number key, so these take modifiers alone.
     property bool modifiersOnly
+    property real boxWidth: 190
 
     signal changed(string newValue)
 
@@ -162,7 +163,7 @@ ConnectedRect {
             // Every modifier pressed since the chord began, as they're released one at a time.
             property var chord: []
 
-            Layout.preferredWidth: 190
+            Layout.preferredWidth: Math.max(root.boxWidth, captureText.implicitWidth + Tokens.padding.large * 2)
             Layout.preferredHeight: captureText.implicitHeight + Tokens.padding.small * 2
             radius: Tokens.rounding.small
             color: root.conflict ? Qt.alpha(Colours.palette.m3error, 0.15)

@@ -18,7 +18,7 @@ QtObject {
         { id: "about", label: qsTr("About"), icon: "info" }
     ]
 
-    // popout: the bar popout mode that opens this page (bar/popouts/Wrapper.qml).
+    // popout: the bar popout mode that opens this page (bar/popouts/Wrapper.qml); key: how other pages find it.
     readonly property list<var> pages: [
         // Personalise
         {
@@ -32,6 +32,12 @@ QtObject {
             label: qsTr("Look & feel"),
             icon: "tune",
             description: qsTr("Gaps, rounding, blur, animations"),
+            category: "personalise"
+        },
+        {
+            label: qsTr("Windows"),
+            icon: "view_column",
+            description: qsTr("Scrolling, window widths, focus"),
             category: "personalise"
         },
         {
@@ -110,7 +116,8 @@ QtObject {
             label: qsTr("Keybinds"),
             icon: "keyboard",
             description: qsTr("Rebind Hyprland shortcuts"),
-            category: "input"
+            category: "input",
+            key: "keybinds"
         },
         {
             label: qsTr("Language & region"),

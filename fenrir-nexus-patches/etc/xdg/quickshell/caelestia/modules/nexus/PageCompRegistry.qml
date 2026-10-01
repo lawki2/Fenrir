@@ -25,6 +25,7 @@ import qs.modules.nexus.pages.services
 import qs.modules.nexus.pages.system
 import qs.modules.nexus.pages.updates
 import qs.modules.nexus.pages.wallandstyle
+import qs.modules.nexus.pages.windows
 import qs.modules.nexus.pages.panels.taskbar
 
 QtObject {
@@ -53,6 +54,13 @@ QtObject {
             StackPage {
                 Component {
                     LookAndFeelPage {}
+                }
+            }
+        },
+        Component {
+            StackPage {
+                Component {
+                    WindowsPage {}
                 }
             }
         },
