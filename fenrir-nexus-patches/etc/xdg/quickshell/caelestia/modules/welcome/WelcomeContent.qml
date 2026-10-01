@@ -46,31 +46,76 @@ Item {
             }
         })
 
-    readonly property list<var> tourSteps: [
-        {
-            title: qsTr("The launcher"),
-            body: qsTr("Tap the Super key on its own, without holding anything else. Search for an app, like \"firefox\" or \"files\", and press Enter to open it. Give it a try before moving on.")
-        },
-        {
-            title: qsTr("Workspaces"),
-            body: qsTr("Workspaces are extra desktops for grouping windows. Press Super and a number from 1 to 9 to jump to one. Windows don't close when you switch; they wait on their workspace until you come back.")
-        },
-        {
-            title: qsTr("Floating windows"),
-            body: qsTr("Windows normally tile, filling the screen without overlapping. Press Super + Alt + Space to lift one out of the tiling so it floats, and again to put it back.")
-        },
-        {
-            title: qsTr("Moving and resizing"),
-            body: qsTr("Hold Super and drag with the left mouse button to move a window, or with the right mouse button to resize it from wherever your cursor is.")
-        },
-        {
-            title: qsTr("Closing a window"),
-            body: qsTr("Press Super + Q to close the window you're in. There's no X to hunt for; every window closes the same way.")
-        }
-    ]
+    // A binding, so a rebind or a reloaded hypr-vars.lua updates the keys shown.
+    readonly property list<var> tourSteps: {
+        const fingers = Chassis.isLaptop ? HyprVars.value("workspaceSwipeFingers") : 0;
+        return [
+            {
+                title: qsTr("The launcher"),
+                body: qsTr("Tap the Super key on its own, without holding anything else. Search for an app, like \"firefox\" or \"files\", and press Enter to open it. Give it a try before moving on."),
+                scene: ""
+            },
+            {
+                title: qsTr("A row of windows"),
+                body: qsTr("New windows open to the right of the one you're using. Instead of shrinking to fit, the row carries on past the edge of the screen, so every window keeps a useful size. Open two or three apps from the launcher to see it."),
+                scene: "row"
+            },
+            {
+                title: qsTr("Getting around"),
+                body: qsTr("Press %1 or %2 to move along the row; it slides along with you. Holding Super while you scroll the mouse wheel does the same.")
+                    .arg(root.combo("SUPER + Left"))
+                    .arg(root.combo("SUPER + Right"))
+                    + (fingers ? qsTr(" On the touchpad, swipe left or right with %1 fingers.").arg(fingers) : ""),
+                scene: "focus"
+            },
+            {
+                title: qsTr("Window widths"),
+                body: qsTr("%1 makes the window you're in wider and %2 makes it narrower, in steps up to the full width of the screen. %3 switches between full width and the width it had before.")
+                    .arg(root.key("kbColumnWider"))
+                    .arg(root.key("kbColumnNarrower"))
+                    .arg(root.key("kbWindowBorderedFullscreen")),
+                scene: "width"
+            },
+            {
+                title: qsTr("Rearranging"),
+                body: qsTr("%1 and %2 move a window along the row. %3 and %4 stack it with its neighbour so the two share a column, or take it back out. You can also hold Super and drag a window to where you want it.")
+                    .arg(root.key("kbColumnMoveLeft"))
+                    .arg(root.key("kbColumnMoveRight"))
+                    .arg(root.key("kbConsumeOrExpelLeft"))
+                    .arg(root.key("kbConsumeOrExpelRight")),
+                scene: "rearrange"
+            },
+            {
+                title: qsTr("Workspaces"),
+                body: qsTr("Workspaces are separate rows, stacked one above the other. Press %1 and a number from 1 to 9 to jump to one, or %2 and %3 to go up or down.")
+                    .arg(root.key("kbGoToWs"))
+                    .arg(root.key("kbPrevWs"))
+                    .arg(root.key("kbNextWs"))
+                    + (fingers ? qsTr(" On the touchpad, swipe up or down with %1 fingers.").arg(fingers) : "")
+                    + qsTr(" Windows stay on their workspace until you come back."),
+                scene: "workspaces"
+            },
+            {
+                title: qsTr("Floating and closing"),
+                body: qsTr("Press %1 to lift a window out of the row so it floats on top, and again to put it back. %2 closes the window you're in; there's no X to hunt for.")
+                    .arg(root.key("kbToggleWindowFloating"))
+                    .arg(root.key("kbCloseWindow")),
+                scene: "float"
+            }
+        ];
+    }
 
     property bool touring: false
     property int tourStep: 0
+
+    // Non-breaking spaces keep a combo like "Ctrl + Super + ←" on one line.
+    function combo(keys: var): string {
+        return FenrirKeys.format(keys).replace(/ /g, "\u00a0");
+    }
+
+    function key(id: string): string {
+        return root.combo(HyprVars.value(id));
+    }
 
     function statusOf(name: string): string {
         const job = `install ${name}`;
@@ -108,7 +153,7 @@ Item {
             StyledText {
                 Layout.fillWidth: true
                 Layout.bottomMargin: Tokens.spacing.large
-                text: qsTr("Fenrir runs on keyboard shortcuts and tiling windows. The tour shows the few you need; the extras below are optional and can be added now or any time from Welcome in the app launcher.")
+                text: qsTr("Fenrir runs on keyboard shortcuts and a scrolling row of windows. The tour shows the few you need; the extras below are optional and can be added now or any time from Welcome in the app launcher.")
                 color: Colours.palette.m3onSurfaceVariant
                 font: Tokens.font.body.medium
                 wrapMode: Text.WordWrap
@@ -119,7 +164,7 @@ Item {
                 last: true
                 icon: "school"
                 text: qsTr("Take the tour")
-                subtext: qsTr("Five short steps for getting around")
+                subtext: qsTr("%1 short steps for getting around").arg(root.tourSteps.length)
                 trailingIcon: "chevron_right"
                 onClicked: {
                     root.tourStep = 0;
@@ -209,6 +254,15 @@ Item {
                 text: root.tourSteps[root.tourStep].title
                 font: Tokens.font.headline.medium
                 wrapMode: Text.WordWrap
+            }
+
+            TourDiagram {
+                id: diagram
+
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.round(diagram.width / 4)
+                visible: diagram.scene !== ""
+                scene: root.tourSteps[root.tourStep].scene
             }
 
             StyledText {

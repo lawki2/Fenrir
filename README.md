@@ -28,8 +28,8 @@ no need to configure anything unless you want to.
 **Less need to edit config files to customize.** Fenrir extends Caelestia's
 settings app with pages for the things you'd otherwise hand-edit:
 
-- **Personalise:** wallpaper and colour scheme, gaps/rounding/blur/animations,
-  desktop clock and visualiser, panels
+- **Personalise:** wallpaper and colour scheme, window widths and scrolling,
+  gaps/rounding/blur/animations, desktop clock and visualiser, panels
 - **Screen:** arrange monitors by dragging, resolution, refresh rate, scale and
   rotation (with a revert countdown), night light on a schedule
 - **Connectivity and devices:** Wi-Fi/VPN, firewall rules, Bluetooth, audio, printers
@@ -51,9 +51,10 @@ components, so the design is coherent with the rest of the system.
 zram plus a swapfile, and out-of-memory protection that closes the app hogging
 memory before the whole system stalls.
 
-**A walkthrough on your first boot** in case you're new to tiling, with the
-basics of using a tiling desktop and one-click extras: gaming, Flatpak, printer
-drivers, media codecs, developer tools and graphics driver detection.
+**A walkthrough on your first boot** in case you're new to scrolling desktops,
+with the basics of getting around the row of windows and one-click extras:
+gaming, Flatpak, printer drivers, media codecs, developer tools and graphics
+driver detection.
 
 Default apps: Zen Browser, foot terminal with fish, Thunar, VSCodium and Shelly
 (a package manager GUI).
