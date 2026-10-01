@@ -2,33 +2,31 @@ local vars = require("variables")
 
 hl.config({
     general = {
-        layout          = "scrolling",
+        layout            = "scrolling",
+        no_focus_fallback = true, -- Fenrir: focus stops at the ends of the row
 
-        allow_tearing   = false, -- Allows `immediate` window rule to work
+        allow_tearing     = false, -- Allows `immediate` window rule to work
 
-        gaps_workspaces = vars.workspaceGaps,
-        gaps_in         = vars.windowGapsIn,
-        gaps_out        = vars.windowGapsOut,
-        border_size     = vars.windowBorderSize,
+        gaps_workspaces   = vars.workspaceGaps,
+        gaps_in           = vars.windowGapsIn,
+        gaps_out          = vars.windowGapsOut,
+        border_size       = vars.windowBorderSize,
 
-        col             = {
+        col               = {
             active_border   = vars.activeWindowBorderColour,
             inactive_border = vars.inactiveWindowBorderColour,
         },
     },
 
-    dwindle = {
-        preserve_split = true,
-        smart_split    = false,
-        smart_resizing = true,
-    },
-
     scrolling = {
-        fullscreen_on_one_column = true,
-        focus_fit_method         = 1,
-        column_width             = 0.5,
+        fullscreen_on_one_column = vars.singleColumnFullWidth,
+        focus_fit_method         = vars.centreFocusedColumn and 0 or 1,
+        column_width             = vars.columnWidth,
         follow_focus             = true,
-        follow_min_visible       = 0.0,
-        explicit_column_widths   = "0.35, 0.5, 0.65, 1.0",
+        -- Fenrir: with focus following the mouse, hovering scrolls the row only once a fifth of the screen shows the column
+        follow_min_visible       = vars.focusFollowsMouse and 0.2 or 0.0,
+        explicit_column_widths   = vars.columnWidthPresets,
+        wrap_focus               = false,
+        wrap_swapcol             = false,
     },
 })

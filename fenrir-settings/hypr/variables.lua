@@ -12,7 +12,7 @@ return {
     fileExplorer               = "thunar",
     audioSettings              = "pavucontrol",
 
-    -- Touchpad and mouse (Fenrir); workspace swipes and the launcher share a finger count, the scratchpad takes the other
+    -- Touchpad and mouse (Fenrir); one finger count moves around (row and workspaces), the other opens the launcher
     kbLayout                   = "us",
     kbOptions                  = "",
     pointerSpeed               = 0,
@@ -57,6 +57,13 @@ return {
     animationsEnabled          = true,
     animationSpeed             = 1,
 
+    -- Scrolling layout and focus (Fenrir); widths are fractions of the screen
+    columnWidth                = 0.5,
+    columnWidthPresets         = "0.35, 0.5, 0.65, 1.0",
+    centreFocusedColumn        = false,
+    singleColumnFullWidth      = true,
+    focusFollowsMouse          = false,
+
     -- Misc
     volumeStep                 = 10,
     volumeMax                  = 100,
@@ -74,8 +81,10 @@ return {
     kbMoveWinToWsGroup         = "CTRL + SUPER + ALT",
     kbGoToWs                   = "SUPER",
     kbGoToWsGroup              = "CTRL + SUPER",
-    kbNextWs                   = "CTRL + SUPER + Right",
-    kbPrevWs                   = "CTRL + SUPER + Left",
+    kbNextWs                   = "CTRL + SUPER + Down",
+    kbPrevWs                   = "CTRL + SUPER + Up",
+    kbMoveWinToWsNext          = "CTRL + SUPER + SHIFT + Down",
+    kbMoveWinToWsPrev          = "CTRL + SUPER + SHIFT + Up",
 
     -- Window Group
     kbWindowGroupCycleNext     = "ALT + TAB",
@@ -92,6 +101,17 @@ return {
     kbWindowBorderedFullscreen = "SUPER + ALT + F",
     kbToggleWindowFloating     = "SUPER + ALT + space",
     kbCloseWindow              = "SUPER + Q",
+
+    -- Scrolling
+    kbColumnMoveLeft           = "SUPER + SHIFT + Left",
+    kbColumnMoveRight          = "SUPER + SHIFT + Right",
+    kbConsumeOrExpelLeft       = "CTRL + SUPER + Left",
+    kbConsumeOrExpelRight      = "CTRL + SUPER + Right",
+    kbColumnWider              = "SUPER + equal",
+    kbColumnNarrower           = "SUPER + minus",
+    kbCentreColumn             = "CTRL + SUPER + C",
+    kbColumnFirst              = "SUPER + Home",
+    kbColumnLast               = "SUPER + End",
 
     -- Special workspaces toggles
     kbSpecialWs                = "SUPER + S",
@@ -114,9 +134,7 @@ return {
     kbLock                     = "SUPER + L",
     kbRestoreLock              = "SUPER + ALT + L",
 
-    -- Screenshot/clipboard (promoted from hardcoded literals so Nexus's
-    -- Keybinds page can rebind them via the existing hypr-vars.lua
-    -- override mechanism, same as every other kbXxx entry above)
+    -- Screenshot/clipboard (Fenrir: kept here so Settings > Keybinds can rebind them)
     kbScreenshot               = "Print",
     kbClipboard                = "SUPER + V",
     kbEmoji                    = "SUPER + Period",

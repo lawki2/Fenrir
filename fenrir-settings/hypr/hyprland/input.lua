@@ -7,7 +7,8 @@ hl.config({
         numlock_by_default = false,
         repeat_delay       = 250,
         repeat_rate        = 35,
-        focus_on_close     = 1,
+        follow_mouse       = vars.focusFollowsMouse and 1 or 2,
+        focus_on_close     = 0, -- Fenrir: the nearest column, not whatever is under the pointer
         sensitivity        = vars.pointerSpeed,
         natural_scroll     = vars.mouseNaturalScroll,
 
