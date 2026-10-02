@@ -1,5 +1,19 @@
 {
   "appearance": {
+    "font": {
+      "headline": {
+        "family": "Rubik"
+      },
+      "title": {
+        "family": "Rubik"
+      },
+      "body": {
+        "family": "Rubik"
+      },
+      "label": {
+        "family": "Rubik"
+      }
+    },
     "transparency": {
       "enabled": true
     }

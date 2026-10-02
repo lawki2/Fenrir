@@ -2,16 +2,16 @@
 """Generates Fenrir's own Caelestia colour scheme.
 
 Mirrors what the dynamic scheme produces from the default wallpaper, but
-fixed and in dark mode: the seed is that wallpaper's dominant tone and the
-variant is the same "vibrant" dynamic uses. Rerun after changing SEED or VARIANT.
+fixed: the seed is Caelestia's score of that wallpaper's thumbnail and the
+variant is tonal spot, matugen's default. Rerun after changing SEED or VARIANT.
 """
 
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-SEED = "6799dc"
-VARIANT = "vibrant"
+SEED = "89b2d3"
+VARIANT = "tonalspot"
 OUT = Path(__file__).resolve().parent.parent / "assets/schemes/fenrir/default"
 
 sys.path.insert(0, "/usr/lib/python3.14/site-packages")

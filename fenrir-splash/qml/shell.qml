@@ -229,7 +229,7 @@ ShellRoot {
                 anchors.fill: parent
                 // Matches the scheme's surface so a missing wallpaper still
                 // fades from something deliberate rather than black.
-                color: "#000d2a"
+                color: "#0b0f11"
                 opacity: root.fading ? 0 : 1
 
                 Image {
