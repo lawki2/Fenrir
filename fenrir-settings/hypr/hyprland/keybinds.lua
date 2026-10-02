@@ -3,6 +3,17 @@ local fn   = require("hyprland.functions")
 
 -- Launcher
 hl.bind("SUPER + SUPER_L", hl.dsp.global("caelestia:launcher"), { release = true })
+-- Super press and release for the workspace drawer; the release-only twin still arrives under shortcut inhibitors
+hl.bind(
+    "SUPER_L",
+    hl.dsp.global("caelestia:superHold"),
+    { ignore_mods = true, non_consuming = true, transparent = true, locked = true }
+)
+hl.bind(
+    "SUPER + SUPER_L",
+    hl.dsp.global("caelestia:superHold"),
+    { release = true, ignore_mods = true, non_consuming = true, transparent = true, locked = true, dont_inhibit = true }
+)
 
 -- Misc
 hl.bind(vars.kbSession, hl.dsp.global("caelestia:session"), { description = "kbSession" })
